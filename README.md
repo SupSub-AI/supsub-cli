@@ -184,7 +184,8 @@ Claude Code（推荐）：
 其他 agent，用 [`skills` CLI](https://github.com/vercel-labs/skills)：
 
 ```bash
-npx skills add SupSub-AI/supsub-cli
+# 静默安装仓库内全部 skills（--skill '*' 选全部，-y 跳过确认）
+npx -y skills add SupSub-AI/supsub-cli --skill '*' -y
 ```
 
 ### 使用

@@ -35,8 +35,8 @@ npm i -g @supsub/cli
 /plugin marketplace add SupSub-AI/supsub-cli
 /plugin install supsub-cli@supsub
 
-# 其他兼容 agent（skills CLI）
-npx skills add SupSub-AI/supsub-cli
+# 其他兼容 agent（skills CLI）：静默安装仓库内全部 skills
+npx -y skills add SupSub-AI/supsub-cli --skill '*' -y
 ```
 
 ---
