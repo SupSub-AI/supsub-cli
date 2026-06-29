@@ -15,6 +15,8 @@ import { registerMpSearch } from '../commands/mp/search.ts';
 import { registerMpSearchCancel } from '../commands/mp/search-cancel.ts';
 // Search command
 import { registerSearch } from '../commands/search.ts';
+// Skills sync commands
+import { registerSkills } from '../commands/skills.ts';
 import { registerSubAdd } from '../commands/sub/add.ts';
 import { registerSubContents } from '../commands/sub/contents.ts';
 // Sub commands
@@ -25,6 +27,7 @@ import { registerUpdate } from '../commands/update.ts';
 import { setCliApiKey } from '../http/credentials.ts';
 import { setCliApiUrl } from '../lib/api-url.ts';
 import { dieWith, type ErrorEnvelope, isErrorEnvelope } from '../lib/errors.ts';
+import { checkSkillsDrift, formatDriftNotice } from '../lib/skills-check.ts';
 
 function toErrorEnvelope(err: unknown): ErrorEnvelope {
   if (isErrorEnvelope(err)) return err;
@@ -33,6 +36,22 @@ function toErrorEnvelope(err: unknown): ErrorEnvelope {
     message: err instanceof Error ? err.message : String(err),
     status: 0,
   };
+}
+
+/**
+ * 本地 skills 落后于当前 CLI 版本时，在 stderr 打印一行同步提示。
+ * 写 stderr 不污染 stdout / `-o json`；help / version / 以及正在处理同步的
+ * skills、update 命令不提示，避免重复打扰。
+ */
+function maybeWarnSkillsDrift(): void {
+  const argv = process.argv.slice(2);
+  if (argv.length === 0) return;
+  const suppress = new Set(['skills', 'update', 'help', '--help', '-h', '--version', '-V']);
+  if (argv.some((a) => suppress.has(a))) return;
+  const drift = checkSkillsDrift();
+  if (drift) {
+    process.stderr.write(`${formatDriftNotice(drift)}\n`);
+  }
 }
 
 export async function run(): Promise<void> {
@@ -81,8 +100,15 @@ export async function run(): Promise<void> {
   registerFocusContents(focus);
   registerFocusRemove(focus);
 
+  // ─── skills 子命令树（同步本地 Agent Skills） ────────────
+  registerSkills(program);
+
   // ─── update 命令（自更新） ────────────────────────────────
   registerUpdate(program);
+
+  // skills 漂移提示：本地 skills 落后于当前 CLI 版本时，在 stderr 提示同步。
+  // 仅一次本地状态文件读，零网络、零子进程；skills / update 命令本身在处理同步，不重复打扰。
+  maybeWarnSkillsDrift();
 
   // 顶层 try/catch：捕获所有命令抛出的错误并统一处理（exit code 由 errors.ts 推导）
   try {

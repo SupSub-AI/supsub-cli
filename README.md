@@ -134,14 +134,32 @@ supsub mp search-cancel <searchId>  取消正在执行的搜索任务
 ### 自更新
 
 ```
-supsub update                       检查并更新到最新版本（下载新 binary 原地替换）
+supsub update                       检查并更新到最新版本（下载新 binary 原地替换，并同步本地 skills）
   --check                           只检查是否有新版本，不实际更新
   --force                           即使已是最新也重新下载安装（修复损坏的 binary）
+  --skip-skills                     本次更新不同步本地 skills
 ```
 
 > 自更新从 npm registry 查最新版本，再从 GitHub Release 下载对应平台的预编译 binary、
 > 原地替换正在运行的可执行文件。若全局安装目录无写权限（如装在需 sudo 的路径），
 > 会提示改用 `npm i -g @supsub/cli@latest` 或加 `sudo` 重试。
+>
+> 二进制替换完成后会顺带把本地 Agent Skills 同步到新版本（best-effort，失败只警告不阻断）。
+> 详见下方 [Skills（AI agent 集成）](#skillsai-agent-集成) 与 [`docs/self-update-flow.md`](./docs/self-update-flow.md)。
+
+### Skills 同步
+
+```
+supsub skills sync                  把本仓库的 skills 同步/更新到本地 agent 配置
+  --project                         装到当前项目（./.agents/skills），默认装到全局（~/.claude/skills）
+  --force                           即使本地已是当前版本也重新同步
+supsub skills status                查看本地 skills 版本 vs 当前 CLI 版本、是否漂移
+supsub skills list                  列出本仓库提供的 skills
+```
+
+> CLI 自更新只换二进制，本地 skills 不会自动跟着升级。supsub 在 `~/.supsub/skills-state.json`
+> 记录「上次同步到的 CLI 版本」，每次运行命令做一次零网络的本地比对——一旦本地 skills 落后于
+> 当前二进制，就在 stderr 提示运行 `supsub skills sync`。设 `SUPSUB_NO_SKILLS_NOTIFIER=1` 可关闭该提示。
 
 ---
 
@@ -159,6 +177,8 @@ supsub update                       检查并更新到最新版本（下载新 b
 | `SUPSUB_API_URL` | API 基地址（同 `--api-url`，命令行 flag 优先级更高） |
 | `SUPSUB_NO_BROWSER` | 设为真值时 `auth login` 不自动打开浏览器（无头 / e2e 环境用） |
 | `SUPSUB_NO_SPINNER` | 设为真值时关闭所有 loading 动画（非 TTY 下本就不渲染） |
+| `SUPSUB_NO_SKILLS_NOTIFIER` | 设为真值时关闭「本地 skills 落后」的启动提示 |
+| `SUPSUB_CONFIG_DIR` | 覆盖配置 / 状态文件目录（默认 `~/.supsub`） |
 ---
 
 ## Skills（AI agent 集成）
@@ -171,6 +191,7 @@ supsub update                       检查并更新到最新版本（下载新 b
 | supsub-sub | `sub list` / `sub add` / `sub remove` / `sub contents` |
 | supsub-search | `search <keyword>` |
 | supsub-mp | `mp search` / `mp search-cancel` |
+| supsub-focus | `focus list` / `focus contents` / `focus remove` |
 
 ### 安装
 
@@ -181,12 +202,22 @@ Claude Code（推荐）：
 /plugin install supsub-cli@supsub
 ```
 
+或装好 CLI 后用 supsub 自带的同步命令（装到全局 `~/.claude/skills`，并登记同步版本）：
+
+```shell
+supsub skills sync
+```
+
 其他 agent，用 [`skills` CLI](https://github.com/vercel-labs/skills)：
 
 ```bash
 # 静默安装仓库内全部 skills 到当前项目（--skill '*' 选全部，-y 跳过确认；项目级，落在 ./.agents/skills/）
 npx -y skills add SupSub-AI/supsub-cli --skill '*' -y
 ```
+
+> 升级后想让本地 skills 跟上：`supsub update` 会自动同步，或随时手动 `supsub skills sync`；
+> `supsub skills status` 可查看本地 skills 是否与当前 CLI 版本一致。完整流程见
+> [`docs/self-update-flow.md`](./docs/self-update-flow.md)。
 
 ### 使用
 

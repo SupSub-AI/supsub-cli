@@ -28,8 +28,11 @@ type PlatformInfo = {
   binaryName: string;
 };
 
-/** 从 package.json#repository.url 解析出 `owner/repo`（与 postinstall 的 REPO 同源） */
-function resolveRepo(): string {
+/**
+ * 从 package.json#repository.url 解析出 `owner/repo`（与 postinstall 的 REPO 同源）。
+ * 导出供 skills-sync 复用：`npx skills add <owner/repo>` 与 Release 资产同一来源。
+ */
+export function getRepoSlug(): string {
   const raw = typeof pkg.repository === 'string' ? pkg.repository : (pkg.repository?.url ?? '');
   const m = raw.match(/github\.com[/:]([^/]+\/[^/.]+)/);
   if (!m?.[1]) {
@@ -70,7 +73,7 @@ export function detectPlatform(): PlatformInfo {
 /** 拼出某版本对应平台资产的下载地址 */
 export function buildDownloadUrl(version: string, info: PlatformInfo): string {
   const asset = `supsub-cli_${version}_${info.platform}_${info.arch}${info.ext}`;
-  return `https://github.com/${resolveRepo()}/releases/download/v${version}/${asset}`;
+  return `https://github.com/${getRepoSlug()}/releases/download/v${version}/${asset}`;
 }
 
 /**

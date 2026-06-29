@@ -21,8 +21,11 @@ type Config = {
 /**
  * 配置目录路径解析。每次调用都重新读 env，方便测试用 SUPSUB_CONFIG_DIR
  * 把整个 CLI 隔离到 tmp 目录里，不污染用户真实 ~/.supsub。
+ *
+ * 导出供 skills 状态文件（skills-state.json）等其他模块复用同一套目录解析，
+ * 避免各处重复读取 SUPSUB_CONFIG_DIR / homedir。
  */
-function getConfigDir(): string {
+export function getConfigDir(): string {
   const override = process.env.SUPSUB_CONFIG_DIR;
   if (override && override.trim() !== '') {
     return override;

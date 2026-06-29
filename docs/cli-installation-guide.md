@@ -75,13 +75,26 @@ supsub --output json auth status
 ## 升级
 
 ```shell
-supsub update            # 自更新到最新版本（下载新 binary 原地替换）
+supsub update            # 自更新到最新版本（下载新 binary 原地替换，并同步本地 skills）
 supsub update --check    # 只检查是否有新版本，不实际更新
 ```
 
 也可用包管理器：`npm i -g @supsub/cli@latest`（会触发 postinstall 重新下载 binary）。
 
 > 自更新从 npm registry 查最新版本，再从 GitHub Release 下载对应平台 binary、原地替换正在运行的可执行文件。若全局安装目录无写权限（如装在需 sudo 的路径），会提示改用包管理器或加 `sudo` 重试。
+
+### Skills 同步（升级后让本地 skills 跟上）
+
+CLI 自更新只换二进制；若你在 agent 里用了配套 skills，升级后本地 skills 需同步到新版本：
+
+```shell
+supsub skills sync       # 同步本地 skills 到当前 CLI 版本（--project 装到项目；--force 强制重装）
+supsub skills status     # 查看本地 skills 版本与当前 CLI 版本是否一致
+```
+
+`supsub update` 会在替换二进制后自动执行一次同步；若用 `npm i -g` 等方式绕过了 `supsub update`，
+下次运行任意 supsub 命令时会在 stderr 提示「本地 skills 落后」，按提示 `supsub skills sync` 即可。
+关闭该提示：`SUPSUB_NO_SKILLS_NOTIFIER=1`。完整时序见 [`self-update-flow.md`](./self-update-flow.md)。
 
 ---
 
