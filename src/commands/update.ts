@@ -54,6 +54,7 @@ function printSkillsHint(outcome: SkillsOutcome): void {
 export function registerUpdate(program: Command): void {
   program
     .command('update')
+    .alias('upgrade')
     .description('检查并更新 supsub 到最新版本（自更新，含本地 skills 同步）')
     .option('--check', '只检查是否有新版本，不实际更新')
     .option('--force', '即使已是最新也重新下载安装（修复损坏的 binary）')
