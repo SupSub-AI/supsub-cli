@@ -2,7 +2,7 @@
 import { request } from '../http/client.ts';
 import type { Article, Subscription } from '../lib/types.ts';
 
-export type SourceType = 'MP' | 'WEBSITE';
+export type SourceType = 'MP' | 'WEBSITE' | 'X';
 
 /** GET /api/subscriptions — 列出订阅源 */
 export async function listSubs(params: { sourceType?: SourceType } = {}): Promise<Subscription[]> {

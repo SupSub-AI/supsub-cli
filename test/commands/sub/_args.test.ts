@@ -11,13 +11,19 @@ describe('commands/sub/_args - normalizeType', () => {
     expect(normalizeType('WEBSITE')).toBe('WEBSITE');
   });
 
+  test('X 大写直接通过（推特）', () => {
+    expect(normalizeType('X')).toBe('X');
+  });
+
   test('小写自动 toUpperCase 后通过', () => {
     expect(normalizeType('mp')).toBe('MP');
     expect(normalizeType('website')).toBe('WEBSITE');
+    expect(normalizeType('x')).toBe('X');
   });
 
   test('两端空白被 trim', () => {
     expect(normalizeType('  mp  ')).toBe('MP');
+    expect(normalizeType('  x  ')).toBe('X');
   });
 
   test('非法值抛出 INVALID_ARGS', () => {
@@ -33,6 +39,16 @@ describe('commands/sub/_args - normalizeType', () => {
 
   test('空串抛出 INVALID_ARGS', () => {
     expect(() => normalizeType('')).toThrow();
+  });
+
+  test('TWITTER 仍被拒绝（推特只接受 X，不接受 TWITTER）', () => {
+    let caught: unknown;
+    try {
+      normalizeType('TWITTER');
+    } catch (e) {
+      caught = e;
+    }
+    expect((caught as { code: string }).code).toBe('INVALID_ARGS');
   });
 });
 

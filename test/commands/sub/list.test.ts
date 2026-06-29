@@ -119,6 +119,33 @@ describe('commands/sub/list - 列出订阅源', () => {
     expect(receivedUrl).toContain('sourceType=MP');
   });
 
+  test('--type x 经 normalizeType 透传为 sourceType=X（推特）', async () => {
+    const program = buildProgram();
+    await program.parseAsync(['node', 'supsub', '--output', 'json', 'sub', 'list', '--type', 'x']);
+    expect(receivedUrl).toContain('sourceType=X');
+  });
+
+  test('表格模式下 sourceType=X 渲染为「推特」', async () => {
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify([
+          {
+            sourceId: '9',
+            sourceType: 'X',
+            name: 'Elon',
+            description: 'tweets',
+            unreadCount: 1,
+          },
+        ]),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+
+    const program = buildProgram();
+    // 默认 table 输出
+    await program.parseAsync(['node', 'supsub', 'sub', 'list']);
+    expect(stdoutOutput).toContain('推特');
+  });
+
   test('非法 --type 抛 INVALID_ARGS（不发起请求）', async () => {
     let fetched = false;
     globalThis.fetch = async (): Promise<Response> => {

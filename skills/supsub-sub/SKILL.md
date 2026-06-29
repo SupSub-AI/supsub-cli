@@ -1,12 +1,24 @@
 ---
 name: supsub-sub
 version: 0.1.0
-description: SupSub 订阅管理 —— 列出 / 添加 / 删除订阅源（微信公众号 MP 或网站 WEBSITE），以及浏览某个已订阅源里的文章列表。匹配「列出我的订阅」「我订阅了哪些」「取消订阅 X」「订阅 X 这个公众号 / 网站」「看 X 订阅里有哪些文章」「X 公众号最近的未读文章」「添加 / 删除订阅源」。⚠️ 不用于跨订阅搜索文章关键词（走 supsub-search），也不用于「发现一个新的公众号」（走 supsub-mp）。
+description: SupSub 订阅管理 —— 列出 / 添加 / 删除订阅源（微信公众号 MP、网站 WEBSITE、推特 X），以及浏览某个已订阅源里的文章列表。匹配「列出我的订阅」「我订阅了哪些」「取消订阅某个号」「订阅某个公众号 / 网站」「看某个订阅里有哪些文章」「某公众号最近的未读文章」「添加 / 删除订阅源」。⚠️ 本 skill 里 `--type X` 专指推特/Twitter 平台账号；用户口语「订阅 X」「X 公众号」中的字母 X 往往只是占位、代指某个具体账号，并不等于 `--type X`。⚠️ 不用于跨订阅搜索文章关键词（走 supsub-search），也不用于「发现一个新的公众号」（走 supsub-mp）。
 ---
 
 # supsub-sub Skill
 
-List, add, remove subscription sources, and browse the articles inside each source. Sources are typed `MP` (微信公众号) or `WEBSITE`.
+List, add, remove subscription sources, and browse the articles inside each source. Sources are typed `MP`（微信公众号）、`WEBSITE`（网站）或 `X`（推特 / Twitter 平台账号）。
+
+## ⚠️ 关于字母「X」的歧义（务必先读）
+
+本文档里 `X` 有两种**完全不同**的含义，不要混淆：
+
+1. **`--type X`** —— 这是一个真实的 sourceType 枚举值，专指 **推特 / Twitter / X 平台账号**。
+2. **占位符 X** —— 用户口语里说「订阅 X」「取消订阅 X」「X 公众号最近的文章」时，这里的 X 通常只是一个占位代号，代指**某个具体账号**（可能是公众号、网站，也可能就是名字里带 X），**与推特无关**。
+
+判定规则：
+
+- 只有当用户**明确提到「推特 / Twitter / X 平台」**时，才使用 `--type X`。
+- 用户说「订阅 X」「X 公众号」「看 X 的文章」而没有提到推特平台时，**不要**据此推断 `--type X`；这里的 X 是占位符，应按其真实类型（多为 `MP` 或 `WEBSITE`）处理。
 
 ## Prerequisites
 
@@ -18,14 +30,14 @@ List, add, remove subscription sources, and browse the articles inside each sour
 ### List subscriptions
 
 ```
-supsub sub list [--type <MP|WEBSITE>]
+supsub sub list [--type <MP|WEBSITE|X>]
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--type` | — (all) | Filter by source type, `MP` 或 `WEBSITE` |
+| `--type` | — (all) | 过滤来源类型：`MP`（公众号）/ `WEBSITE`（网站）/ `X`（推特） |
 
-Each row includes: `sourceId`, `sourceType`, `name`, `img`, `description`, `unreadCount`.
+Each row includes: `sourceId`, `sourceType`, `name`, `img`, `description`, `unreadCount`。表格模式下 `类型` 列会把 sourceType 显示为中文：`MP`→公众号、`WEBSITE`→网站、`X`→推特。
 
 ```bash
 # 列出全部订阅
@@ -36,6 +48,9 @@ supsub sub list --type MP
 
 # 仅看网站
 supsub sub list --type WEBSITE
+
+# 仅看推特（X 平台账号）
+supsub sub list --type X
 
 # 导出 JSON
 supsub sub list -o json
@@ -51,7 +66,7 @@ JSON shape: `{"success":true,"data":[{"sourceType":"MP","sourceId":12345,"name":
 
 ```
 # A) 全局搜索 / 已收录源 → 用内部正整数 sourceId
-supsub sub add --source-id <id> --type <MP|WEBSITE> [--group <gid>]...
+supsub sub add --source-id <id> --type <MP|WEBSITE|X> [--group <gid>]...
 
 # B) mp search 发现的微信原生公众号 → 用 base64 字符串 mpId
 supsub sub add --mp-id <mpId> [--type MP] [--group <gid>]...
@@ -61,7 +76,7 @@ supsub sub add --mp-id <mpId> [--type MP] [--group <gid>]...
 |------|----------|-------------|
 | `--source-id` | 二选一 | 信息源 ID（正整数）。来自 `supsub search` / `supsub sub list` 的 `sourceId` |
 | `--mp-id` | 二选一 | 公众号 mpId（base64 字符串）。来自 `supsub mp search` 返回结果 |
-| `--type` | 见说明 | `--source-id` 模式必填；`--mp-id` 模式可省，传了必须是 `MP` |
+| `--type` | 见说明 | `--source-id` 模式必填，取 `MP` / `WEBSITE` / `X`（推特）；`--mp-id` 模式可省，传了必须是 `MP` |
 | `--group` | no | 分组 ID（数字，可重复指定多个） |
 
 > **互斥**：`--source-id` 与 `--mp-id` 必须恰好二选一。同时给 / 都不给都会抛 `INVALID_ARGS`。
@@ -69,11 +84,14 @@ supsub sub add --mp-id <mpId> [--type MP] [--group <gid>]...
 > 两条路径走的是不同 endpoint：`--source-id` → `POST /api/subscriptions`（已收录源订阅）；`--mp-id` → `POST /api/mps`（按微信原生 ID 把新公众号纳入并订阅）。
 
 ```bash
-# 路径 A：sub list / search 看到的内部 sourceId
+# 路径 A：sub list / search 看到的内部 sourceId（公众号）
 supsub sub add --source-id 12345 --type MP
 
 # 路径 A：网站 + 多分组
 supsub sub add --source-id 67890 --type WEBSITE --group 1 --group 2
+
+# 路径 A：推特账号（用户明确说要订阅某个 Twitter / X 平台账号时）
+supsub sub add --source-id 24680 --type X
 
 # 路径 B：mp search 拿到的 mpId（base64）
 supsub sub add --mp-id "MzkyNTYzODk0NQ=="
@@ -94,17 +112,23 @@ JSON shape: `{"success":true,"data":{"message":"..."}}`
 ### Remove a subscription
 
 ```
-supsub sub remove --source-id <id> --type <MP|WEBSITE>
+supsub sub remove --source-id <id> --type <MP|WEBSITE|X>
 ```
 
 | Flag | Required | Description |
 |------|----------|-------------|
 | `--source-id` | yes | 信息源 ID（正整数） |
-| `--type` | yes | `MP` 或 `WEBSITE` |
+| `--type` | yes | `MP`（公众号）/ `WEBSITE`（网站）/ `X`（推特） |
 
 ```bash
+# 取消订阅某个公众号
 supsub sub remove --source-id 12345 --type MP
+
+# 取消订阅某个网站
 supsub sub remove --source-id 67890 --type WEBSITE -o json
+
+# 取消订阅某个推特账号
+supsub sub remove --source-id 24680 --type X
 ```
 
 JSON shape: `{"success":true,"data":{"message":"..."}}`
@@ -114,13 +138,13 @@ JSON shape: `{"success":true,"data":{"message":"..."}}`
 ### Browse articles in a subscription
 
 ```
-supsub sub contents --source-id <id> --type <MP|WEBSITE> [--unread | --all]
+supsub sub contents --source-id <id> --type <MP|WEBSITE|X> [--unread | --all]
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--source-id` | required | 信息源 ID（正整数） |
-| `--type` | required | `MP` 或 `WEBSITE` |
+| `--type` | required | `MP`（公众号）/ `WEBSITE`（网站）/ `X`（推特） |
 | `--unread` | (default) | 仅返回未读文章 |
 | `--all` | — | 返回全部文章（已读 + 未读） |
 
@@ -129,11 +153,14 @@ supsub sub contents --source-id <id> --type <MP|WEBSITE> [--unread | --all]
 每行字段：`articleId`, `url`, `title`, `coverImage`, `tags[]`, `summary`, `publishedAt`, `isRead`。
 
 ```bash
-# 默认（未读）
+# 默认（未读）—— 看某个公众号里有哪些文章
 supsub sub contents --source-id 12345 --type MP
 
 # 全部文章（含已读）
 supsub sub contents --source-id 12345 --type MP --all
+
+# 看某个推特账号里的全部内容
+supsub sub contents --source-id 24680 --type X --all
 
 # 全部文章 + JSON
 supsub sub contents --source-id 12345 --type MP --all -o json
@@ -149,11 +176,12 @@ JSON shape: `{"success":true,"data":[{"articleId":"...","url":"...","title":"...
 
 - 解析数据时统一用 `-o json`；表格输出有截断、列宽限制，不适合做下游处理。
 - 所有 JSON 响应都是 `{"success":true,"data":<payload>}` 结构（来自 `src/ui/output.ts`）。
-- `--type` 取值是 `MP` 或 `WEBSITE`（CLI 内部会 `toUpperCase`）；常见错误是写成 `mp` 大小写虽允许，但写 `mp_account` / `wechat` / `rss` 会报 `INVALID_ARGS`。
+- `--type` 取值是 `MP` / `WEBSITE` / `X`（CLI 内部会 `toUpperCase`，大小写不敏感）；常见错误是写成 `mp_account` / `wechat` / `rss` / `TWITTER` 会报 `INVALID_ARGS`——**推特只接受 `X`，不接受 `TWITTER`**。
+- 再次强调字母「X」的歧义：`--type X` = 推特平台账号。用户口语里「订阅 X」「X 公众号」「看 X 的文章」中的 X 多半是占位符代指某个具体账号，**不要**因为出现字母 X 就传 `--type X`；只有用户明确提到「推特 / Twitter / X 平台」时才用 `--type X`。
 - 添加订阅前先想清楚 ID 来源：
   - 来自 `supsub search` / `sub list` 的 **内部正整数** `sourceId` → `sub add --source-id <id> --type ...`
   - 来自 `supsub mp search` 的 **base64 字符串** `mpId` → `sub add --mp-id <mpId>`（type 默认 MP，可省）
   - 不要把 `mp search` 的 `mpId` 强转成数字塞进 `--source-id` —— 那是不同 ID 空间，会被后端拒。
-- `sub contents` 默认只看未读 —— 如果用户问"这个公众号有哪些文章"通常意味着 `--all`。
+- `sub contents` 默认只看未读 —— 如果用户问"这个号有哪些文章"通常意味着 `--all`。
 - `sub contents` 一次最多返回 20 条文章（后端默认 `pageSize=20`），CLI 不支持翻页；想看更早的历史目前没有 CLI 命令可达。
 - Exit codes：`0` OK，`2` UNAUTHORIZED，`64` INVALID_ARGS（`--type` / `--source-id` / `--group` 校验失败、`--all` 与 `--unread` 互斥），其他网络/服务端错误 `10` / `11`。

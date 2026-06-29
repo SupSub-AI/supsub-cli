@@ -11,7 +11,7 @@ export function registerSubRemove(parent: Command): void {
     .command('remove')
     .description('取消订阅')
     .requiredOption('--source-id <id>', '信息源 ID')
-    .requiredOption('--type <type>', '信息源类型：MP|WEBSITE')
+    .requiredOption('--type <type>', '信息源类型：MP|WEBSITE|X（X=推特）')
     .action(async (opts: { sourceId: string; type: string }) => {
       const globalOpts = (parent.parent?.opts() ?? {}) as { output?: string };
       const fmt = globalOpts.output;

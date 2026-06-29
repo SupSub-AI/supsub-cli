@@ -4,13 +4,13 @@ import type { ErrorEnvelope } from '../../lib/errors.ts';
 /**
  * 规范化 --type 参数（toUpperCase 后校验）
  */
-export function normalizeType(input: string): 'MP' | 'WEBSITE' {
+export function normalizeType(input: string): 'MP' | 'WEBSITE' | 'X' {
   const v = input.trim().toUpperCase();
-  if (v !== 'MP' && v !== 'WEBSITE') {
+  if (v !== 'MP' && v !== 'WEBSITE' && v !== 'X') {
     throw {
       code: 'INVALID_ARGS',
       status: 0,
-      message: `--type 仅支持 MP 或 WEBSITE，收到: ${input}`,
+      message: `--type 仅支持 MP / WEBSITE / X，收到: ${input}`,
     } satisfies ErrorEnvelope;
   }
   return v;

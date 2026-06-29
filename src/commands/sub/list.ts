@@ -11,6 +11,7 @@ function sourceKindLabel(sourceType: string): string {
   const t = sourceType.toUpperCase();
   if (t === 'MP') return '公众号';
   if (t === 'WEBSITE') return '网站';
+  if (t === 'X') return '推特';
   return sourceType;
 }
 
@@ -36,7 +37,7 @@ export function registerSubList(parent: Command): void {
   parent
     .command('list')
     .description('列出订阅源')
-    .option('--type <type>', '过滤类型：MP|WEBSITE')
+    .option('--type <type>', '过滤类型：MP|WEBSITE|X（X=推特）')
     .action(async (opts: { type?: string }) => {
       const globalOpts = (parent.parent?.opts() ?? {}) as { output?: string };
       const fmt = globalOpts.output;

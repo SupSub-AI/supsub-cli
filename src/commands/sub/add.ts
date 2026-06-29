@@ -19,7 +19,7 @@ export function registerSubAdd(parent: Command): void {
     )
     .option(
       '--type <type>',
-      '信息源类型：MP|WEBSITE。配合 --source-id 必填；配合 --mp-id 可省略，默认 MP',
+      '信息源类型：MP|WEBSITE|X（X=推特）。配合 --source-id 必填；配合 --mp-id 可省略，默认 MP',
     )
     .option(
       '--group <gid>',

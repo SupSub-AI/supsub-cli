@@ -59,7 +59,7 @@ export function registerSubContents(parent: Command): void {
     .command('contents')
     .description('查看订阅源内容')
     .requiredOption('--source-id <id>', '信息源 ID')
-    .requiredOption('--type <type>', '信息源类型：MP|WEBSITE')
+    .requiredOption('--type <type>', '信息源类型：MP|WEBSITE|X（X=推特）')
     .option('--all', '显示全部文章')
     .option('--unread', '仅显示未读（默认）')
     .action(async (opts: { sourceId: string; type: string; all?: boolean; unread?: boolean }) => {

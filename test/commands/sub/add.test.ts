@@ -199,6 +199,25 @@ describe('commands/sub/add - 添加订阅', () => {
     expect(captured.body).toEqual({ sourceType: 'MP', sourceId: 693 });
   });
 
+  test('--source-id + --type X（推特）走 POST /api/subscriptions，body 含 sourceType:X', async () => {
+    const program = buildProgram();
+    await program.parseAsync([
+      'node',
+      'supsub',
+      '--output',
+      'json',
+      'sub',
+      'add',
+      '--source-id',
+      '42',
+      '--type',
+      'x',
+    ]);
+    expect(captured.method).toBe('POST');
+    expect(captured.url).toContain('/api/subscriptions');
+    expect(captured.body).toEqual({ sourceType: 'X', sourceId: 42 });
+  });
+
   test('--source-id 不带 --type 抛 INVALID_ARGS', async () => {
     let fetched = false;
     globalThis.fetch = async (): Promise<Response> => {
