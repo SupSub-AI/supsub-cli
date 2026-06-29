@@ -1,6 +1,6 @@
 {
   "name": "@supsub/cli",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "supsub command-line tool",
   "type": "module",
   "homepage": "https://github.com/SupSub-AI/supsub-cli",
