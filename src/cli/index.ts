@@ -6,6 +6,10 @@ import pkg from '../../package.json' with { type: 'json' };
 import { registerAuthLogin } from '../commands/auth/login.ts';
 import { registerAuthLogout } from '../commands/auth/logout.ts';
 import { registerAuthStatus } from '../commands/auth/status.ts';
+// Focus commands
+import { registerFocusContents } from '../commands/focus/contents.ts';
+import { registerFocusList } from '../commands/focus/list.ts';
+import { registerFocusRemove } from '../commands/focus/remove.ts';
 // MP commands
 import { registerMpSearch } from '../commands/mp/search.ts';
 import { registerMpSearchCancel } from '../commands/mp/search-cancel.ts';
@@ -70,6 +74,12 @@ export async function run(): Promise<void> {
   const mp = program.command('mp').description('公众号相关操作');
   registerMpSearch(mp);
   registerMpSearchCancel(mp);
+
+  // ─── focus 子命令树 ───────────────────────────────────────
+  const focus = program.command('focus').description('关注点管理');
+  registerFocusList(focus);
+  registerFocusContents(focus);
+  registerFocusRemove(focus);
 
   // ─── update 命令（自更新） ────────────────────────────────
   registerUpdate(program);
