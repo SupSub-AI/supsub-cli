@@ -63,7 +63,7 @@ export function setSkillsSyncRunner(runner: SyncRunner | undefined): void {
 }
 
 export type SyncOptions = {
-  /** 安装范围，默认 global（~/.claude/skills，全局可用） */
+  /** 安装范围，默认 project（./.agents/skills，仅当前项目；全局安装侵入性强，需显式 --global 选择） */
   scope?: SkillsScope;
   /** 同步到的目标版本，默认当前 CLI 版本 */
   version?: string;
@@ -117,7 +117,7 @@ export async function syncSkills(
   opts: SyncOptions = {},
   now: () => Date = () => new Date(),
 ): Promise<SyncResult> {
-  const scope: SkillsScope = opts.scope ?? 'global';
+  const scope: SkillsScope = opts.scope ?? 'project';
   const version = opts.version ?? CURRENT_VERSION;
 
   let out: { stdout: string; stderr: string };

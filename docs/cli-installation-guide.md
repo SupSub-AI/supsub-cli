@@ -88,7 +88,7 @@ supsub update --check    # 只检查是否有新版本，不实际更新
 CLI 自更新只换二进制；若你在 agent 里用了配套 skills，升级后本地 skills 需同步到新版本：
 
 ```shell
-supsub skills sync       # 同步本地 skills 到当前 CLI 版本（--project 装到项目；--force 强制重装）
+supsub skills sync       # 同步本地 skills 到当前 CLI 版本（默认仅装当前项目；--global 装到全局、--force 强制重装）
 supsub skills status     # 查看本地 skills 版本与当前 CLI 版本是否一致
 ```
 

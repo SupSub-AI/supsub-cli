@@ -2,7 +2,7 @@
 import type { Command } from 'commander';
 import { isErrorEnvelope } from '../lib/errors.ts';
 import { checkForUpdate, performUpdate } from '../lib/self-update.ts';
-import { readSyncedVersion } from '../lib/skills-state.ts';
+import { readSkillsState } from '../lib/skills-state.ts';
 import { type SyncResult, syncSkills } from '../lib/skills-sync.ts';
 import { output } from '../ui/output.ts';
 import { withSpinner } from '../ui/spinner.ts';
@@ -16,16 +16,19 @@ type SkillsOutcome =
 
 /**
  * 自更新顺带把本地 skills 同步到目标版本：CLI 自更新只换二进制，skills 装在
- * ~/.claude/skills 里不会自动跟着走，这里补上同步。best-effort——skills 同步失败
+ * 项目 ./.agents/skills（或全局 ~/.claude/skills）里不会自动跟着走，这里补上同步。best-effort——skills 同步失败
  * 不影响「二进制已更新」这个既成事实，只降级为一条警告。
  */
 async function runSkillsSync(targetVersion: string, force: boolean): Promise<SkillsOutcome> {
-  if (!force && readSyncedVersion() === targetVersion) {
+  const state = readSkillsState();
+  if (!force && state?.version === targetVersion) {
     return { action: 'in_sync' };
   }
   try {
+    // 沿用上次同步的范围：老用户装在哪（global / project）就同步到哪，不要把全局
+    // 用户悄悄改成项目级、或反过来。从未同步过（state 为 null）则走默认 project。
     const result = await withSpinner(`同步 skills 到 v${targetVersion}…`, () =>
-      syncSkills({ version: targetVersion }),
+      syncSkills({ version: targetVersion, scope: state?.scope }),
     );
     return { action: 'synced', result };
   } catch (err) {

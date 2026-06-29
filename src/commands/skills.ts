@@ -26,11 +26,14 @@ function registerSkillsSync(group: Command): void {
   group
     .command('sync')
     .description('把本仓库的 skills 同步/更新到本地 agent 配置')
-    .option('--project', '安装到当前项目（./.agents/skills），默认安装到全局（~/.claude/skills）')
+    .option(
+      '--global',
+      '安装到全局（~/.claude/skills，对所有项目可见），默认仅装到当前项目（./.agents/skills）',
+    )
     .option('--force', '即使本地已是当前版本也重新同步')
-    .action(async (opts: { project?: boolean; force?: boolean }) => {
+    .action(async (opts: { global?: boolean; force?: boolean }) => {
       const fmt = globalFmt(group);
-      const scope = opts.project ? 'project' : 'global';
+      const scope = opts.global ? 'global' : 'project';
 
       // 已同步且非强制：直接告知，省去一次 npx 子进程
       const state = readSkillsState();

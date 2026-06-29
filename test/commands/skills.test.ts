@@ -265,26 +265,45 @@ describe('commands/skills - 命令路径（mock runner，捕获 stdout）', () =
     expect(parsed.data.inSync).toBe(false);
   });
 
-  test('skills sync --output json（注入 runner）→ synced=true 并写状态', async () => {
-    let called = false;
-    setSkillsSyncRunner(async () => {
-      called = true;
+  test('skills sync --output json（注入 runner）→ 默认 project 范围、synced=true 并写状态', async () => {
+    let calledArgs: string[] | null = null;
+    setSkillsSyncRunner(async (args) => {
+      calledArgs = args;
       return { stdout: 'ok', stderr: '' };
     });
     const program = buildProgram();
     await program.parseAsync(['node', 'supsub', '--output', 'json', 'skills', 'sync']);
     const parsed = JSON.parse(stdoutOutput);
-    expect(called).toBe(true);
+    expect(calledArgs).not.toBeNull();
+    // 默认不带 -g：仅装到当前项目，不污染全局
+    expect(calledArgs as unknown as string[]).not.toContain('-g');
     expect(parsed.data.synced).toBe(true);
+    expect(parsed.data.scope).toBe('project');
     expect(parsed.data.version).toBe(CURRENT_VERSION);
+    expect(readSkillsState()?.scope).toBe('project');
     expect(readSyncedVersion()).toBe(CURRENT_VERSION);
+  });
+
+  test('skills sync --global → 带 -g、范围 global', async () => {
+    let calledArgs: string[] | null = null;
+    setSkillsSyncRunner(async (args) => {
+      calledArgs = args;
+      return { stdout: 'ok', stderr: '' };
+    });
+    const program = buildProgram();
+    await program.parseAsync(['node', 'supsub', '--output', 'json', 'skills', 'sync', '--global']);
+    const parsed = JSON.parse(stdoutOutput);
+    expect(calledArgs as unknown as string[]).toContain('-g');
+    expect(parsed.data.scope).toBe('global');
+    expect(readSkillsState()?.scope).toBe('global');
   });
 
   test('skills sync 已是最新（非 force）→ 跳过 runner，upToDate=true', async () => {
     writeSkillsState({
       version: CURRENT_VERSION,
       skills: [...OFFICIAL_SKILLS],
-      scope: 'global',
+      // 默认范围为 project：状态需与默认 scope 一致才算「已是最新」可跳过
+      scope: 'project',
       syncedAt: '2026-06-29T00:00:00.000Z',
     });
     let called = false;

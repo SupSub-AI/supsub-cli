@@ -119,8 +119,8 @@ supsub [全局选项] <命令> [子命令] [参数]
 
 | 命令 | 功能 |
 |---|---|
-| `supsub skills sync` | 用 `npx skills add` 把本仓库 skills 同步到本地 agent 配置，成功后记录同步版本 |
-| `supsub skills sync --project` | 装到当前项目 `./.agents/skills`（默认 `--global` → `~/.claude/skills`） |
+| `supsub skills sync` | 用 `npx skills add` 把本仓库 skills 同步到本地 agent 配置，**默认仅装到当前项目** `./.agents/skills`，成功后记录同步版本 |
+| `supsub skills sync --global` | 改装到全局 `~/.claude/skills`（对所有项目可见；全局侵入性强，需显式指定） |
 | `supsub skills sync --force` | 即使本地已是当前版本也重新同步 |
 | `supsub skills status` | 查看本地 skills 版本 vs 当前 CLI 版本、是否漂移 |
 | `supsub skills list` | 列出本仓库提供的 skills |

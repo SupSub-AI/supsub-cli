@@ -103,7 +103,7 @@ flowchart TD
 {
   "version": "0.3.2",
   "skills": ["supsub-auth", "supsub-sub", "supsub-search", "supsub-mp", "supsub-focus"],
-  "scope": "global",
+  "scope": "project",
   "syncedAt": "2026-06-29T12:00:00.000Z"
 }
 ```
@@ -116,7 +116,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Start(["supsub skills sync<br/>[--project] [--force]"]):::start --> Read["readSkillsState()"]:::step
+    Start(["supsub skills sync<br/>[--global] [--force]"]):::start --> Read["readSkillsState()"]:::step
     Read --> Dec{"非 --force 且<br/>state.version == CLI 版本 且<br/>scope 一致 且 skills 非空？"}:::dec
     Dec -->|是| UpToDate["✅ 本地 skills 已是最新<br/>跳过 npx 子进程"]:::out --> End1([exit 0]):::start
     Dec -->|否| Build["buildSkillsAddArgs(scope)<br/>npx -y skills add OWNER/REPO [-g] -y"]:::step
@@ -134,7 +134,8 @@ flowchart TD
 ```
 
 - **同步机制**：复用社区 `skills` CLI（`npx -y skills add <owner/repo> [-g] -y`），直接从本仓库 GitHub 源拉取——与 README 既有文档、`larksuite/cli` 的 `runSkillsAdd` 同一套命令。
-- **范围**：默认 `global`（`-g` → `~/.claude/skills`，全局可用）；`--project` 去掉 `-g`，装到当前项目 `./.agents/skills`。
+- **范围**：默认 `project`（不带 `-g`，装到当前项目 `./.agents/skills`，**不污染其他项目**）；`--global` 加 `-g`，装到 `~/.claude/skills` 对所有项目可见。全局安装侵入性强，改为显式 opt-in。
+- **自更新沿用既有范围**：`supsub update` 顺带的自动同步会读取 `skills-state.json` 里上次的 `scope`，装在哪就同步到哪（老的全局用户保持全局，不会被悄悄改成项目级）；从未同步过则走默认 `project`。
 - **runner 可注入**（`setSkillsSyncRunner`）：测试用 fake runner 替换，不真的起子进程 / 连网。
 - **owner/repo 来源**：`getRepoSlug()` 解析 `package.json#repository.url`，与 Release 资产同源。
 
@@ -217,7 +218,7 @@ sequenceDiagram
 | `supsub update --check` | 只查版本，不下载、不动 skills |
 | `supsub update --force` | 即使已最新也重装二进制并重同步 skills |
 | `supsub update --skip-skills` | 本次更新不同步 skills |
-| `supsub skills sync` | 同步本地 skills 到当前 CLI 版本（`--project` / `--force`） |
+| `supsub skills sync` | 同步本地 skills 到当前 CLI 版本（默认仅当前项目；`--global` 装到全局、`--force` 强制重装） |
 | `supsub skills status` | 查看本地 skills 版本 vs CLI 版本、是否漂移 |
 | `supsub skills list` | 列出本仓库提供的 skills |
 
