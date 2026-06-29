@@ -26,9 +26,19 @@ export async function getFocusContents(params: {
   });
 }
 
-/** DELETE /api/focuses/{focusId} — 删除关注点（破坏性，不可逆） */
-export async function removeFocus(params: { focusId: number }): Promise<{ message: string }> {
-  return request<{ message: string }>({
+/**
+ * DELETE /api/focuses/{focusId} — 删除关注点（破坏性，不可逆）
+ *
+ * 注意：后端成功响应形态在文档里自相矛盾（标注 204 又带 {message}）。
+ * 实测无法在不删真实数据的前提下确认，故这里容错两种形态：
+ *   - 204 No Content（request() 返回 undefined）
+ *   - 2xx + { message }
+ * 调用方需按 `result?.message` 取值。
+ */
+export async function removeFocus(params: {
+  focusId: number;
+}): Promise<{ message?: string } | undefined> {
+  return request<{ message?: string } | undefined>({
     method: 'DELETE',
     path: `/api/focuses/${params.focusId}`,
   });

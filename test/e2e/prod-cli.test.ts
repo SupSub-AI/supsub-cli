@@ -77,10 +77,10 @@ describe.skipIf(SKIP)('e2e/prod-cli - 通过子进程驱动 CLI 打测试环境'
     expect(r.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
   });
 
-  test('查看顶层帮助：列出 auth/sub/search/mp 全部命令', async () => {
+  test('查看顶层帮助：列出 auth/sub/search/mp/focus 全部命令', async () => {
     const r = await runCli(['--help'], { tmpHome });
     expect(r.code).toBe(0);
-    for (const cmd of ['auth', 'sub', 'search', 'mp']) {
+    for (const cmd of ['auth', 'sub', 'search', 'mp', 'focus']) {
       expect(r.stdout).toContain(cmd);
     }
   });
@@ -276,6 +276,31 @@ describe.skipIf(SKIP)('e2e/prod-cli - 通过子进程驱动 CLI 打测试环境'
     for (const s of body.data) {
       expect(s.sourceType).toBe('WEBSITE');
     }
+  });
+
+  test('只看推特(X)订阅：后端接受 X 类型，返回数组且全是 X', async () => {
+    const r = await runCli(['--output', 'json', 'sub', 'list', '--type', 'X'], {
+      tmpHome,
+      withAuth: true,
+    });
+    expect(r.code).toBe(0);
+    const body = JSON.parse(r.stdout);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.data)).toBe(true);
+    for (const s of body.data) {
+      expect(s.sourceType).toBe('X');
+    }
+  });
+
+  test('用小写 x 看订阅列表：自动归一为 X（不再因 X 非法而报 64）', async () => {
+    const r = await runCli(['--output', 'json', 'sub', 'list', '--type', 'x'], {
+      tmpHome,
+      withAuth: true,
+    });
+    expect(r.code).toBe(0);
+    const body = JSON.parse(r.stdout);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.data)).toBe(true);
   });
 
   test('用小写 mp 看订阅列表：自动归一为 MP', async () => {

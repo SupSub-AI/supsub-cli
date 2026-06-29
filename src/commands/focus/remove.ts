@@ -18,7 +18,9 @@ export function registerFocusRemove(parent: Command): void {
       const focusId = parseFocusId(opts.id);
       const data = await withSpinner('删除关注点…', () => removeFocus({ focusId }));
 
-      output({ message: data.message }, fmt, (d) => {
+      // 后端成功可能返回 204 无 body（data 为 undefined）或 { message }，兜底文案
+      const message = data?.message ?? '已删除关注点';
+      output({ message }, fmt, (d) => {
         printTable({
           headers: ['结果'],
           rows: [[d.message]],
