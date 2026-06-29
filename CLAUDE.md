@@ -92,3 +92,14 @@ Defaults to `https://supsub.net`. Override with the `--api-url` global flag or t
 
 - **Comments and user-facing strings are in Chinese.** New code should match — don't switch to English mid-file.
 - Implementation note: the `mp search` command (used only for the narrow 公众号-discovery flow above) is async — it polls for ~30s then returns a `searchId` for follow-up via `mp search-cancel <searchId>`. See `skills/supsub-mp/SKILL.md` for full behavior.
+
+## 发布流程
+
+> **⚠️ 强制门禁：发版前必须与用户二次确认版本号。** 收到「发版 / 发布 / release / 出个新版本」类请求时，**先**根据改动给出建议版本号（语义化版本：bugfix/文档 → patch，向后兼容的新功能 → minor，破坏性变更 → major）并**明确询问用户确认**。**只有用户确认版本号之后**，才可以进入下面的正式发布流程。未确认前不要 bump 版本、不要 commit、不要打 tag、不要推送。
+
+确认版本号后，按惯例执行：
+
+1. **bump 版本号** —— 更新 `package.json#version` 到确认的 `X.Y.Z`。
+2. **`chore(release)` commit** —— 提交信息形如 `chore(release): vX.Y.Z`。
+3. **打 tag** —— `git tag vX.Y.Z`（tag 名带 `v` 前缀）。
+4. **推 tag 触发 CI** —— `git push --tags`。`.github/workflows/release.yml` 由 `v*` tag 触发，自动构建多平台 binary（darwin/linux/windows × amd64/arm64）、创建 GitHub Release、并以 OIDC trusted publishing 发布到 npm（`@supsub/cli`）。CI 会在版本不一致时自行 `npm version` 对齐，无需手动改 npm 上的版本。
