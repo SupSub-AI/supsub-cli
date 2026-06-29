@@ -1,7 +1,7 @@
 ---
 name: supsub-search
 version: 0.1.0
-description: SupSub 全文搜索 —— 在订阅源（公众号 / 网站）和文章正文里跨源搜索内容。用户说「搜一下 X 相关的内容 / 文章」「在 supsub 里搜 X」「查 X 相关文章」「全文搜索 X」「找 X 的内容」「search articles/content in SupSub」时使用本 skill。注意：本 skill 用于搜「内容 / 文章 / 订阅源标题」；如果用户想发现一个新的微信公众号本身（拿 mpId 准备订阅），改用 supsub-mp。
+description: SupSub 全文搜索 —— 在订阅源（公众号 / 网站）和文章正文里跨源搜索内容。用户说「搜一下 X 相关的内容 / 文章」「在 supsub 里搜 X」「查 X 相关文章」「全文搜索 X」「找 X 的内容」「search articles/content in SupSub」时使用本 skill。⚠️ 范围判定：用户**未指明范围**时，「搜 X / 查 X」一律走本 skill（全局 / 全站搜索）；若用户**明确限定到本人数据范围**（出现「我的订阅」「我的公众号」「我的网站」「我的关注点」「我订阅的…」等），属确定范围，**不走全局搜索**——「我的订阅 / 我的公众号 / 我的网站」→ supsub-sub，「我的关注点」→ supsub-focus。注意：本 skill 用于搜「内容 / 文章 / 订阅源标题」；如果用户想发现一个新的微信公众号本身（拿 mpId 准备订阅），改用 supsub-mp。
 ---
 
 # supsub-search Skill
