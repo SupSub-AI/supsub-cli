@@ -1,6 +1,6 @@
 ---
 name: supsub-sub
-version: 0.1.0
+version: 0.1.1
 description: SupSub 订阅管理 —— 列出 / 添加 / 删除订阅源（微信公众号 MP、网站 WEBSITE、推特 X），以及浏览某个已订阅源里的文章列表。匹配「列出我的订阅」「我订阅了哪些」「取消订阅某个号」「订阅某个公众号 / 网站」「看某个订阅里有哪些文章」「某公众号最近的未读文章」「添加 / 删除订阅源」。⚠️ 本 skill 里 `--type X` 专指推特/Twitter 平台账号；用户口语「订阅 X」「X 公众号」中的字母 X 往往只是占位、代指某个具体账号，并不等于 `--type X`。⚠️ 动词判别：本 skill 只认「订阅 / 订阅了」；用户说「关注 / 关注了 / 我关注了哪些 / 我的关注点」时走 supsub-focus（关注点），不是本 skill。⚠️ 不用于跨订阅搜索文章关键词（走 supsub-search），也不用于「发现一个新的公众号」（走 supsub-mp）。
 ---
 
@@ -24,6 +24,7 @@ List, add, remove subscription sources, and browse the articles inside each sour
 
 - 安装：`pnpm add -g @supsub/cli`（或 `npm i -g @supsub/cli`）
 - 已登录：`supsub auth status` 显示 Authenticated（首次使用先 `supsub auth login`）
+- **未授权（exit 2 / UNAUTHORIZED）时不要止步于「你未登录」**：直接运行 `supsub auth login` 为用户打开浏览器授权（命令会自动打开浏览器并阻塞等待授权，请用足够长的超时，如 10 分钟；用户只需在浏览器点确认，无需在终端输入任何内容），授权成功后重试原命令。无浏览器 / 无头环境再回退为提示用户 `SUPSUB_NO_BROWSER=1 supsub auth login`。
 
 ## Commands
 

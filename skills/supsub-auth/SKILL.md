@@ -1,6 +1,6 @@
 ---
 name: supsub-auth
-version: 0.1.0
+version: 0.1.1
 description: SupSub CLI 认证管理 —— 登录 / 登出 / 查看登录状态。登录走 OAuth 浏览器设备授权，CLI 不支持 API Key 登录。匹配「supsub 登录」「supsub 登出」「查看我在 supsub 的登录状态」「我现在 supsub 用的是哪个账号」「supsub auth login / logout / status」。在调用其他 supsub 子命令前，如不确定凭证状态可先用本 skill 跑 `supsub auth status`。
 ---
 
@@ -86,7 +86,8 @@ JSON 模式下输出 `{"success":true,"data":{}}`。
 
 ## Agent Usage Notes
 
-- 在调用其他 supsub 子命令之前先跑 `supsub auth status`，确认凭证有效；未登录时引导用户 `supsub auth login`。
+- 在调用其他 supsub 子命令之前先跑 `supsub auth status`，确认凭证有效。
+- **未登录 / 任意命令返回 exit 2（UNAUTHORIZED）时不要止步于告知用户「未登录」**：直接运行 `supsub auth login` 为用户打开浏览器授权（命令会自动打开浏览器并阻塞等待授权，请用足够长的超时，如 10 分钟；用户只需在浏览器点确认，无需在终端输入任何内容），授权成功后重试原命令。无浏览器 / 无头环境再回退为提示用户 `SUPSUB_NO_BROWSER=1 supsub auth login`。
 - CLI **不支持 API Key 登录**，也没有 `--api-key` flag / `SUPSUB_API_KEY` 环境变量；登录唯一入口是 `supsub auth login`（OAuth 设备授权）。
 - 请求所用 Bearer 凭证由 `resolveApiKey()` 解析，优先级（高 → 低）：配置文件 `access_token`（OAuth 设备授权令牌）> 配置文件 `bearer_token`（高级用法：手动从浏览器粘贴的临时会话 token）。
 - 401 响应会自动清除本地存储的全部凭证（`access_token` / `refresh_token` / `bearer_token`，见 `src/http/client.ts` 调用的 `clearAuth()`）；遇到 exit code `2` 时通常需要重新登录。
