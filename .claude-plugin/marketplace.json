@@ -8,7 +8,7 @@
     {
       "name": "supsub-cli",
       "source": "./",
-      "description": "Agent skills for the SupSub CLI: auth / sub / search / mp",
+      "description": "Agent skills for the SupSub CLI: auth / sub / search / mp / focus",
       "homepage": "https://github.com/SupSub-AI/supsub-cli",
       "repository": "https://github.com/SupSub-AI/supsub-cli",
       "license": "MIT",

@@ -17,7 +17,7 @@ export type UserInfo = {
 
 // ─── 订阅相关 ────────────────────────────────────────────────
 export type Subscription = {
-  sourceType: 'MP' | 'WEBSITE';
+  sourceType: 'MP' | 'WEBSITE' | 'X';
   sourceId: number;
   name: string;
   img: string;
@@ -83,4 +83,28 @@ export type MpSearchTaskResult = {
     img: string;
     description: string;
   } | null;
+};
+
+// ─── 关注点（focus）相关 ──────────────────────────────────────
+/** 关注点列表项（GET /api/focuses） */
+export type Focus = {
+  id: number;
+  icon: string; // emoji
+  title: string;
+  unreadCount: number;
+};
+
+/** 关注点内容条目（GET /api/focuses/{id}/contents），聚合多来源 */
+export type FocusContent = {
+  articleId: string;
+  url: string;
+  title: string;
+  coverImage: string;
+  keywords: string[];
+  tags: string[];
+  summary: string;
+  sourceType: string; // MP / WEBSITE / X …
+  sourceName: string;
+  publishedAt: unknown; // 整数秒级时间戳或字符串，渲染时兼容
+  isRead: boolean;
 };
