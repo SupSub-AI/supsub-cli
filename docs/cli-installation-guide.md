@@ -26,9 +26,9 @@ npm i -g @supsub/cli
 
 ---
 
-## 第 2 步（可选）　配置 Agent Skills
+## 第 2 步　配置 Agent Skills（必须）
 
-若在 Claude Code / Cursor 等 agent 中使用，可安装配套技能包，让 agent 用自然语言驱动 supsub：
+在 Claude Code / Cursor 等 agent 中使用 supsub 时，**必须**安装配套技能包，agent 才能用自然语言正确驱动 supsub：
 
 ```shell
 # Claude Code 插件市场
