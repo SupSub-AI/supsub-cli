@@ -26,7 +26,7 @@ export type Subscription = {
 };
 
 export type Article = {
-  articleId: string;
+  contentId: string; // 旧契约为 articleId，2026-07 实测线上已统一为 contentId
   url: string;
   title: string;
   coverImage: string;
@@ -34,6 +34,17 @@ export type Article = {
   summary: string;
   publishedAt: unknown; // schema: integer 时间戳；example: "2025-06-18 11:49:46"
   isRead: boolean;
+};
+
+/**
+ * contents 的 JSON 输出形态：在原字段上补一个人类/agent 可读的 `publishedAtText`。
+ * 原始 `publishedAt`（多为 Unix 秒）保留，便于调用方排序。
+ */
+export type ArticleJson = Article & { publishedAtText: string };
+
+/** `--brief` 精简形态：批量枚举时只保留定位与判重所需字段，避免 summary 撑爆输出 */
+export type ArticleBrief = Pick<Article, 'contentId' | 'title' | 'publishedAt' | 'isRead'> & {
+  publishedAtText: string;
 };
 
 // ─── 搜索相关 ────────────────────────────────────────────────
@@ -96,7 +107,8 @@ export type Focus = {
 
 /** 关注点内容条目（GET /api/focuses/{id}/contents），聚合多来源 */
 export type FocusContent = {
-  articleId: string;
+  contentId: string; // 旧契约为 articleId，2026-07 实测线上已统一为 contentId
+
   url: string;
   title: string;
   coverImage: string;
@@ -107,4 +119,53 @@ export type FocusContent = {
   sourceName: string;
   publishedAt: unknown; // 整数秒级时间戳或字符串，渲染时兼容
   isRead: boolean;
+};
+
+/** focus contents 的 JSON 输出形态（同 ArticleJson，补 `publishedAtText`） */
+export type FocusContentJson = FocusContent & { publishedAtText: string };
+
+/** focus contents 的 `--brief` 精简形态：多保留 sourceType / sourceName，因为关注点是跨源聚合的 */
+export type FocusContentBrief = Pick<
+  FocusContent,
+  'contentId' | 'title' | 'publishedAt' | 'isRead' | 'sourceType' | 'sourceName'
+> & { publishedAtText: string };
+
+// ─── 订阅分组（group）相关 ────────────────────────────────────
+/**
+ * 分组。id 宽容为 number|string：api.json 声明列表 id 为 int、创建返回为
+ * string(uuid)，2026-07 实测两处均为 int，但为防后端切换 uuid 保留宽容类型；
+ * 拼 path 时统一 String()。
+ */
+export type Group = {
+  id: number | string;
+  name: string;
+};
+
+/** 创建分组结果（POST /api/groups，201） */
+export type GroupCreateResult = {
+  id: number | string;
+};
+
+/** 分组订阅源条目（GET /api/groups/{id}/subscriptions） */
+export type GroupSubscription = {
+  sourceType: string; // MP / WEBSITE / X / PODCAST / NEWSLETTER（比订阅命令的三值枚举宽）
+  sourceId: number;
+  name: string;
+  img: string;
+  description: string;
+  inGroup: boolean;
+  unreadCount?: number; // 仅 groupOnly=true 时返回（2026-07 实测确认）
+};
+
+/** 分组成员写入形态（POST /api/groups/{id}/subscriptions 的 body 元素） */
+export type GroupMember = {
+  sourceType: string;
+  sourceId: number;
+};
+
+// ─── 未读概览 ────────────────────────────────────────────────
+/** supsub unread 的聚合结果（并发拉取订阅列表 + 关注点列表） */
+export type UnreadOverview = {
+  subscriptions: Subscription[];
+  focuses: Focus[];
 };

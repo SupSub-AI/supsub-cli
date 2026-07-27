@@ -74,6 +74,7 @@ describe('commands/focus/contents - 查看关注点内容', () => {
   let originalStdout: typeof process.stdout.write;
   let receivedUrl: string;
   let fetched: boolean;
+  let stdoutOutput: string;
 
   beforeEach(async () => {
     originalFetch = globalThis.fetch;
@@ -81,10 +82,14 @@ describe('commands/focus/contents - 查看关注点内容', () => {
     process.env.SUPSUB_API_URL = 'http://fake-host';
     receivedUrl = '';
     fetched = false;
+    stdoutOutput = '';
 
-    // 吞掉命令产生的 stdout（本组用例只断言请求构造与校验拦截，不关心渲染结果）
+    // 捕获命令产生的 stdout（多数用例只断言请求构造与校验拦截，--brief 用例会检查输出字段）
     originalStdout = process.stdout.write.bind(process.stdout);
-    process.stdout.write = (() => true) as typeof process.stdout.write;
+    process.stdout.write = ((chunk: string | Uint8Array): boolean => {
+      stdoutOutput += typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk);
+      return true;
+    }) as typeof process.stdout.write;
 
     await fs.mkdir(CONFIG_DIR, { recursive: true });
     await fs.writeFile(
@@ -174,6 +179,47 @@ describe('commands/focus/contents - 查看关注点内容', () => {
     expect(fetched).toBe(false);
   });
 
+  test('--page 2 --page-size 50 透传到 query', async () => {
+    const program = buildProgram();
+    await program.parseAsync([
+      'node',
+      'supsub',
+      '--output',
+      'json',
+      'focus',
+      'contents',
+      '--id',
+      '42',
+      '--page',
+      '2',
+      '--page-size',
+      '50',
+    ]);
+    expect(receivedUrl).toContain('page=2');
+    expect(receivedUrl).toContain('pageSize=50');
+  });
+
+  test('--page-size 200 超上限抛 INVALID_ARGS（不发起请求）', async () => {
+    const program = buildProgram();
+    let caught: unknown;
+    try {
+      await program.parseAsync([
+        'node',
+        'supsub',
+        'focus',
+        'contents',
+        '--id',
+        '42',
+        '--page-size',
+        '200',
+      ]);
+    } catch (e) {
+      caught = e;
+    }
+    expect((caught as { code: string }).code).toBe('INVALID_ARGS');
+    expect(fetched).toBe(false);
+  });
+
   test('--all 与 --unread 互斥抛 INVALID_ARGS（不发起请求）', async () => {
     const program = buildProgram();
     let caught: unknown;
@@ -194,5 +240,87 @@ describe('commands/focus/contents - 查看关注点内容', () => {
     expect((caught as { code: string }).code).toBe('INVALID_ARGS');
     expect((caught as { message: string }).message).toContain('互斥');
     expect(fetched).toBe(false);
+  });
+
+  test('--brief 保留跨源聚合字段（sourceType/sourceName），丢掉 summary/url', async () => {
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify([
+          {
+            contentId: 'AwOk3di8m6eVeIUjzNftgg',
+            url: 'https://mp.weixin.qq.com/s/yyy',
+            title: '关注点内容',
+            coverImage: '',
+            keywords: ['a'],
+            tags: ['b'],
+            summary: '很长的摘要'.repeat(50),
+            sourceType: 'MP',
+            sourceName: '量子位',
+            publishedAt: 1784790480,
+            isRead: false,
+          },
+        ]),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    const program = buildProgram();
+    await program.parseAsync([
+      'node',
+      'supsub',
+      '--output',
+      'json',
+      'focus',
+      'contents',
+      '--id',
+      '42',
+      '--brief',
+    ]);
+    const parsed = JSON.parse(stdoutOutput);
+    expect(Object.keys(parsed.data[0]).sort()).toEqual([
+      'contentId',
+      'isRead',
+      'publishedAt',
+      'publishedAtText',
+      'sourceName',
+      'sourceType',
+      'title',
+    ]);
+    expect(parsed.data[0].summary).toBeUndefined();
+    expect(parsed.data[0].publishedAtText).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+  });
+
+  test('非 brief 的 json 也补 publishedAtText', async () => {
+    globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify([
+          {
+            contentId: 'c1',
+            url: 'u',
+            title: 't',
+            coverImage: '',
+            keywords: [],
+            tags: [],
+            summary: 's',
+            sourceType: 'MP',
+            sourceName: 'n',
+            publishedAt: 1784790480,
+            isRead: true,
+          },
+        ]),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    const program = buildProgram();
+    await program.parseAsync([
+      'node',
+      'supsub',
+      '--output',
+      'json',
+      'focus',
+      'contents',
+      '--id',
+      '42',
+    ]);
+    const parsed = JSON.parse(stdoutOutput);
+    expect(parsed.data[0].summary).toBe('s');
+    expect(parsed.data[0].publishedAtText).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
   });
 });

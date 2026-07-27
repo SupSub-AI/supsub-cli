@@ -43,6 +43,8 @@ export async function getContents(params: {
   sourceType: SourceType;
   sourceId: number;
   type: 'all' | 'unread';
+  page?: number;
+  pageSize?: number;
 }): Promise<Article[]> {
   return request<Article[]>({
     method: 'GET',
@@ -51,17 +53,21 @@ export async function getContents(params: {
       sourceType: params.sourceType,
       sourceId: params.sourceId,
       type: params.type,
-      page: 1,
-      pageSize: 20,
+      page: params.page ?? 1,
+      pageSize: params.pageSize ?? 20,
     },
   });
 }
 
-/** POST /api/subscriptions/contents/mark-as-read — 标记已读 */
+/**
+ * POST /api/subscriptions/contents/mark-as-read — 整源标记已读。
+ *
+ * 后端也接受 contentId 只标单篇，但 CLI 不暴露：文章没有「详情 / 阅读」这一步，
+ * 产生不了自然的单篇已读事件，只保留用户明确表达的整源已读。无 mark-as-unread，不可逆。
+ */
 export async function markAsRead(body: {
   sourceType: SourceType;
   sourceId: number;
-  contentId?: string;
 }): Promise<void> {
   await request<undefined>({
     method: 'POST',

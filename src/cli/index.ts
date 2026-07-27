@@ -9,7 +9,16 @@ import { registerAuthStatus } from '../commands/auth/status.ts';
 // Focus commands
 import { registerFocusContents } from '../commands/focus/contents.ts';
 import { registerFocusList } from '../commands/focus/list.ts';
+import { registerFocusMarkRead } from '../commands/focus/mark-read.ts';
 import { registerFocusRemove } from '../commands/focus/remove.ts';
+// Group commands（订阅分组）
+import { registerGroupAdd } from '../commands/group/add.ts';
+import { registerGroupAddSub } from '../commands/group/add-sub.ts';
+import { registerGroupList } from '../commands/group/list.ts';
+import { registerGroupRemove } from '../commands/group/remove.ts';
+import { registerGroupRemoveSub } from '../commands/group/remove-sub.ts';
+import { registerGroupRename } from '../commands/group/rename.ts';
+import { registerGroupSubs } from '../commands/group/subs.ts';
 // MP commands
 import { registerMpSearch } from '../commands/mp/search.ts';
 import { registerMpSearchCancel } from '../commands/mp/search-cancel.ts';
@@ -21,7 +30,10 @@ import { registerSubAdd } from '../commands/sub/add.ts';
 import { registerSubContents } from '../commands/sub/contents.ts';
 // Sub commands
 import { registerSubList } from '../commands/sub/list.ts';
+import { registerSubMarkRead } from '../commands/sub/mark-read.ts';
 import { registerSubRemove } from '../commands/sub/remove.ts';
+// Unread overview command（未读概览）
+import { registerUnread } from '../commands/unread.ts';
 // Self-update command
 import { registerUpdate } from '../commands/update.ts';
 import { setCliApiKey } from '../http/credentials.ts';
@@ -40,18 +52,33 @@ function toErrorEnvelope(err: unknown): ErrorEnvelope {
 
 /**
  * 本地 skills 落后于当前 CLI 版本时，在 stderr 打印一行同步提示。
- * 写 stderr 不污染 stdout / `-o json`；help / version / 以及正在处理同步的
- * skills、update 命令不提示，避免重复打扰。
+ * help / version / 以及正在处理同步的 skills、update 命令不提示，避免重复打扰。
+ *
+ * ⚠️ `-o json` 时**完全不打印**：写 stderr 原本是为了不污染 stdout，但 agent 侧的
+ * Bash 工具会把 stdout / stderr 合并呈现，这行提示于是混进 JSON 结果里，实测出现过
+ * agent 把「skills 版本不一致」当成任务结论转述给终端用户。json 模式基本等同 agent 调用，
+ * 直接静默；人类用的 table 模式仍然提示。
  */
 function maybeWarnSkillsDrift(): void {
   const argv = process.argv.slice(2);
   if (argv.length === 0) return;
   const suppress = new Set(['skills', 'update', 'help', '--help', '-h', '--version', '-V']);
   if (argv.some((a) => suppress.has(a))) return;
+  if (isJsonOutput(argv)) return;
   const drift = checkSkillsDrift();
   if (drift) {
     process.stderr.write(`${formatDriftNotice(drift)}\n`);
   }
+}
+
+/** 从原始 argv 判断是否 `-o json` / `--output json`（含 `--output=json` 写法）。导出仅为便于单测。 */
+export function isJsonOutput(argv: string[]): boolean {
+  return argv.some(
+    (a, i) =>
+      a === '--output=json' ||
+      a === '-o=json' ||
+      ((a === '-o' || a === '--output') && argv[i + 1] === 'json'),
+  );
 }
 
 export async function run(): Promise<void> {
@@ -85,6 +112,7 @@ export async function run(): Promise<void> {
   registerSubAdd(sub);
   registerSubRemove(sub);
   registerSubContents(sub);
+  registerSubMarkRead(sub);
 
   // ─── search 命令 ──────────────────────────────────────────
   registerSearch(program);
@@ -98,7 +126,21 @@ export async function run(): Promise<void> {
   const focus = program.command('focus').description('关注点管理');
   registerFocusList(focus);
   registerFocusContents(focus);
+  registerFocusMarkRead(focus);
   registerFocusRemove(focus);
+
+  // ─── group 子命令树（订阅分组） ───────────────────────────
+  const group = program.command('group').description('订阅分组管理');
+  registerGroupList(group);
+  registerGroupAdd(group);
+  registerGroupRename(group);
+  registerGroupRemove(group);
+  registerGroupSubs(group);
+  registerGroupAddSub(group);
+  registerGroupRemoveSub(group);
+
+  // ─── unread 命令（未读概览） ──────────────────────────────
+  registerUnread(program);
 
   // ─── skills 子命令树（同步本地 Agent Skills） ────────────
   registerSkills(program);

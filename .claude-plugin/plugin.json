@@ -1,6 +1,6 @@
 {
   "name": "supsub-cli",
-  "description": "Agent skills for the SupSub CLI: auth / sub / search / mp / focus",
+  "description": "Agent skills for the SupSub CLI: auth / sub / search / mp / focus / group / unread",
   "author": {
     "name": "dumou"
   },

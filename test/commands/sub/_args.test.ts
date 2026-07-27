@@ -1,6 +1,13 @@
 // commands/sub/_args 纯函数：normalizeType / parseSourceId / requireExclusive
 import { describe, expect, test } from 'bun:test';
-import { normalizeType, parseSourceId, requireExclusive } from '../../../src/commands/sub/_args.ts';
+import {
+  normalizeType,
+  parsePage,
+  parsePageSize,
+  parseSourceId,
+  requireExclusive,
+  requireOneOf,
+} from '../../../src/commands/sub/_args.ts';
 
 describe('commands/sub/_args - normalizeType', () => {
   test('MP 大写直接通过', () => {
@@ -110,5 +117,69 @@ describe('commands/sub/_args - requireExclusive', () => {
 
   test('两者都为 falsy（空串/0/false）时不抛', () => {
     expect(() => requireExclusive({ all: false, unread: 0 }, ['all', 'unread'], 'x')).not.toThrow();
+  });
+});
+
+describe('commands/sub/_args - requireOneOf', () => {
+  test('两者都未设置时抛 INVALID_ARGS 携带自定义 message', () => {
+    let caught: unknown;
+    try {
+      requireOneOf({}, ['contentId', 'all'], '必须指定其一');
+    } catch (e) {
+      caught = e;
+    }
+    expect((caught as { code: string }).code).toBe('INVALID_ARGS');
+    expect((caught as { message: string }).message).toBe('必须指定其一');
+  });
+
+  test('仅其一时不抛', () => {
+    expect(() => requireOneOf({ contentId: 'abc' }, ['contentId', 'all'], 'x')).not.toThrow();
+    expect(() => requireOneOf({ all: true }, ['contentId', 'all'], 'x')).not.toThrow();
+  });
+
+  test('两者都设置时不抛（互斥由 requireExclusive 负责）', () => {
+    expect(() =>
+      requireOneOf({ contentId: 'abc', all: true }, ['contentId', 'all'], 'x'),
+    ).not.toThrow();
+  });
+});
+
+describe('commands/sub/_args - parsePage', () => {
+  test('正整数通过', () => {
+    expect(parsePage('1')).toBe(1);
+    expect(parsePage('37')).toBe(37);
+  });
+
+  test('零 / 负数 / 小数 / 非数字抛 INVALID_ARGS', () => {
+    for (const bad of ['0', '-1', '1.5', 'abc']) {
+      let caught: unknown;
+      try {
+        parsePage(bad);
+      } catch (e) {
+        caught = e;
+      }
+      expect((caught as { code: string }).code).toBe('INVALID_ARGS');
+    }
+  });
+});
+
+describe('commands/sub/_args - parsePageSize', () => {
+  test('边界 1 与 100 通过', () => {
+    expect(parsePageSize('1')).toBe(1);
+    expect(parsePageSize('100')).toBe(100);
+    expect(parsePageSize('20')).toBe(20);
+  });
+
+  test('0 / 101 / 小数 / 非数字抛 INVALID_ARGS', () => {
+    for (const bad of ['0', '101', '2.5', 'abc']) {
+      let caught: unknown;
+      try {
+        parsePageSize(bad);
+      } catch (e) {
+        caught = e;
+      }
+      expect((caught as { code: string }).code).toBe('INVALID_ARGS');
+      expect((caught as { message: string }).message).toContain(bad);
+    }
   });
 });

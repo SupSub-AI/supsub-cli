@@ -115,6 +115,58 @@ supsub sub contents                 查看订阅源内的文章
   --type <MP|WEBSITE>               必填
   --unread                          仅未读（默认）
   --all                             全部文章（与 --unread 互斥）
+  --page <n>                        页码（默认 1）
+  --page-size <n>                   每页条数 1-100（默认 20）
+
+supsub sub mark-read                整源标记已读（不可逆，无取消已读命令）
+  --source-id <id>                  必填
+  --type <MP|WEBSITE>               必填
+  --all                             必填，确认整源全部已读（不支持单篇已读）
+```
+
+### 关注点
+
+```
+supsub focus list                   列出关注点（含 unreadCount）
+supsub focus contents               查看关注点内容
+  --id <focusId>                    必填
+  --unread / --all                  未读（默认）/ 全部，互斥
+  --page <n> / --page-size <n>      翻页（默认 1 / 20，page-size 上限 100）
+
+supsub focus mark-read              整个关注点标记已读（不可逆）
+  --id <focusId>                    必填
+  --all                             必填，确认全部已读（不支持单篇已读）
+
+supsub focus remove --id <focusId>  删除关注点（不可逆，CLI 无新增能力）
+```
+
+### 订阅分组
+
+```
+supsub group list                   列出分组
+supsub group add <name>             创建分组（返回新分组 id）
+supsub group rename                 重命名分组
+  --id <gid> --name <newName>       均必填
+
+supsub group remove --id <gid>      删除分组（不可逆；组内订阅源不受影响）
+
+supsub group subs                   查看分组订阅源
+  --id <gid>                        必填
+  --all                             显示全部源（带 inGroup 列；不带则仅组内成员 + unreadCount）
+  --type <MP|WEBSITE|X|PODCAST|NEWSLETTER>  按类型过滤
+
+supsub group add-sub                把订阅源加入分组（幂等）
+supsub group remove-sub             把订阅源移出分组（幂等，不会退订）
+  --id <gid> --source-id <sid> --type <MP|WEBSITE|X>   均必填
+```
+
+> 分组成员编辑走后端的「全量覆盖」端点，CLI 内部做读-改-写，请勿并发编辑同一分组。
+
+### 未读概览
+
+```
+supsub unread                       订阅源 + 关注点的未读概览（默认只显示有未读的）
+  --all                             含无未读的项
 ```
 
 ### 搜索
@@ -188,10 +240,12 @@ supsub skills list                  列出本仓库提供的 skills
 | Skill | 覆盖命令 |
 |-------|----------|
 | supsub-auth | `auth login` / `auth status` / `auth logout` |
-| supsub-sub | `sub list` / `sub add` / `sub remove` / `sub contents` |
+| supsub-sub | `sub list` / `sub add` / `sub remove` / `sub contents` / `sub mark-read` |
 | supsub-search | `search <keyword>` |
 | supsub-mp | `mp search` / `mp search-cancel` |
-| supsub-focus | `focus list` / `focus contents` / `focus remove` |
+| supsub-focus | `focus list` / `focus contents` / `focus mark-read` / `focus remove` |
+| supsub-group | `group list` / `add` / `rename` / `remove` / `subs` / `add-sub` / `remove-sub` |
+| supsub-unread | `unread` + 未读工作流（钻取未读列表 → `sub` / `focus mark-read --all` 整体已读） |
 
 ### 安装
 

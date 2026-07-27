@@ -29,15 +29,19 @@ export const OFFICIAL_SKILLS = [
   'supsub-search',
   'supsub-mp',
   'supsub-focus',
+  'supsub-group',
+  'supsub-unread',
 ] as const;
 
 /** 各 skill 的一句话说明（供 `skills list` 展示） */
 export const SKILL_DESCRIPTIONS: Record<string, string> = {
   'supsub-auth': '登录 / 登出 / 查看登录状态',
-  'supsub-sub': '订阅源管理（list / add / remove / contents）',
+  'supsub-sub': '订阅源管理（list / add / remove / contents / mark-read）',
   'supsub-search': '全站关键词搜索文章 / 内容',
   'supsub-mp': '公众号发现（mp search）→ 拿 mpId 订阅',
-  'supsub-focus': '关注点管理（list / contents / remove）',
+  'supsub-focus': '关注点管理（list / contents / mark-read / remove）',
+  'supsub-group': '订阅分组管理（list / add / rename / remove / subs / add-sub / remove-sub）',
+  'supsub-unread': '未读工作流：概览（unread）→ 未读列表 → 标记已读',
 };
 
 /**
