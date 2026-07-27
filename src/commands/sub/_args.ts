@@ -47,3 +47,50 @@ export function requireExclusive(
     } satisfies ErrorEnvelope;
   }
 }
+
+/**
+ * 校验二选一必给（两者都未设置则抛错），与 requireExclusive 配对使用
+ */
+export function requireOneOf(
+  opts: Record<string, unknown>,
+  keys: [string, string],
+  message: string,
+): void {
+  if (!opts[keys[0]] && !opts[keys[1]]) {
+    throw {
+      code: 'INVALID_ARGS',
+      status: 0,
+      message,
+    } satisfies ErrorEnvelope;
+  }
+}
+
+/**
+ * 解析 --page 为正整数
+ */
+export function parsePage(input: string): number {
+  const n = Number(input);
+  if (!Number.isInteger(n) || n <= 0) {
+    throw {
+      code: 'INVALID_ARGS',
+      status: 0,
+      message: `--page 必须是正整数，收到: ${input}`,
+    } satisfies ErrorEnvelope;
+  }
+  return n;
+}
+
+/**
+ * 解析 --page-size 为 1-100 的整数
+ */
+export function parsePageSize(input: string): number {
+  const n = Number(input);
+  if (!Number.isInteger(n) || n < 1 || n > 100) {
+    throw {
+      code: 'INVALID_ARGS',
+      status: 0,
+      message: `--page-size 必须是 1-100 的整数，收到: ${input}`,
+    } satisfies ErrorEnvelope;
+  }
+  return n;
+}

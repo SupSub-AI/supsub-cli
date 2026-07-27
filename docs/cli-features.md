@@ -19,6 +19,8 @@ supsub [全局选项] <命令> [子命令] [参数]
 | `-V, --version` | 打印版本号 | — |
 | `-h, --help` | 打印帮助（每个子命令也支持） | — |
 
+> **信息源类型 `--type`** 全 CLI 统一取值 `MP`（公众号）/ `WEBSITE`（网站）/ `X`（推特，后端只认 `X`，不认 `TWITTER`），大小写不敏感。表格里的「类型」列渲染为中文（公众号 / 网站 / 推特；分组成员还可能出现网页端加入的播客 / 通讯）。
+
 ---
 
 ## 1. 认证 `auth`
@@ -37,13 +39,15 @@ supsub [全局选项] <命令> [子命令] [参数]
 
 ## 2. 订阅源 `sub`
 
+订阅源 = 一个具体的号（公众号 / 网站 / 推特账号），按 `sourceId` + `sourceType` 定位。
+
 ### `supsub sub list` — 列出订阅源
 
 | 选项 | 说明 |
 |---|---|
-| `--type <MP\|WEBSITE>` | 按类型过滤（可选） |
+| `--type <MP\|WEBSITE\|X>` | 按类型过滤（可选） |
 
-输出列：`sourceId`、`类型`、`name`、`description`，末尾显示总条数。
+输出列：`sourceId`、`类型`、`name`、`description`，末尾显示总条数。`-o json` 的每项还带 `unreadCount`（未读数）。
 
 ### `supsub sub add` — 添加订阅
 
@@ -53,30 +57,134 @@ supsub [全局选项] <命令> [子命令] [参数]
 |---|---|
 | `--source-id <id>` | 内部信息源 ID（正整数，来自 `search` / `sub list`）；**必须配合 `--type`** |
 | `--mp-id <mpId>` | 公众号 mpId（base64，来自 `mp search`）；`--type` 可省，默认 `MP` |
-| `--type <MP\|WEBSITE>` | 信息源类型 |
+| `--type <MP\|WEBSITE\|X>` | 信息源类型 |
 | `--group <gid>` | 分组 ID，可重复指定以加入多个分组 |
+
+> `--source-id` 与 `--mp-id` 是两个不同的 ID 空间，不可互换：前者是站内正整数，后者是微信原生 base64 串。
 
 ### `supsub sub remove` — 取消订阅
 
 | 选项 | 说明 |
 |---|---|
 | `--source-id <id>` | 必填 |
-| `--type <MP\|WEBSITE>` | 必填 |
+| `--type <MP\|WEBSITE\|X>` | 必填 |
 
 ### `supsub sub contents` — 查看订阅源内文章
 
 | 选项 | 说明 |
 |---|---|
-| `--source-id <id>` | 必填 |
-| `--type <MP\|WEBSITE>` | 必填 |
+| `--source-id <id>` | 必填（别名 `--id`，与 `focus contents --id` 写法对齐） |
+| `--type <MP\|WEBSITE\|X>` | 必填 |
 | `--unread` | 仅未读（默认） |
 | `--all` | 全部文章（与 `--unread` 互斥） |
+| `--brief` | 精简输出：只留 `contentId` / `title` / 发布时间 / 已读状态 |
+| `--page <n>` | 页码（默认 `1`） |
+| `--page-size <n>` | 每页条数 `1`-`100`（默认 `20`） |
 
-输出列：`publishedAt`（`YYYY-MM-DD HH:mm`）、`read`（已读为 `✓`）、`title`、`articleId`、`url`。
+输出列：`publishedAt`（`YYYY-MM-DD HH:mm`）、`read`（已读为 `✓`）、`title`、`contentId`、`url`；`--brief` 时去掉 `url` 列。
+
+> 默认只返回**未读**。要按时间浏览「最近有什么」需显式加 `--all`，否则该源读完后会返回空列表。
+
+### `supsub sub mark-read` — 整源标记已读
+
+| 选项 | 说明 |
+|---|---|
+| `--source-id <id>` | 必填 |
+| `--type <MP\|WEBSITE\|X>` | 必填 |
+| `--all` | **必填**，确认把该源全部内容标为已读 |
+
+> **只有「整源已读」一档，没有单篇已读。** 文章在 SupSub 里没有「详情 / 阅读」这一步，产生不了自然的单篇已读事件，因此 CLI 只保留用户明确表达的「这个号我读完了」。传 `--content-id` 会以退出码 `64` 报错并说明原因。
+>
+> **`--all` 必填且不可逆**：后端没有 mark-as-unread，标错无法恢复。要求显式给出 `--all`，是为了让「清空一个源」始终是一次明确动作而非误触。
 
 ---
 
-## 3. 搜索 `search`
+## 3. 关注点 `focus`
+
+关注点 = 用户自定义的主题方向（带 AI 聚合，跨多个来源），按 `focus id` 定位。**CLI 无新增关注点能力**（在网页端创建）。
+
+### `supsub focus list` — 列出关注点
+
+无选项。输出列：`id`、`icon`、`title`、`unreadCount`。
+
+### `supsub focus contents` — 查看关注点内容
+
+| 选项 | 说明 |
+|---|---|
+| `--id <focusId>` | 必填 |
+| `--unread` | 仅未读（默认） |
+| `--all` | 全部内容（与 `--unread` 互斥） |
+| `--brief` | 精简输出：只留 `contentId` / `title` / 来源 / 发布时间 / 已读状态 |
+| `--page <n>` | 页码（默认 `1`） |
+| `--page-size <n>` | 每页条数 `1`-`100`（默认 `20`） |
+
+输出列：`publishedAt`、`read`、`title`、`sourceType`、`sourceName`、`contentId`、`url`；`--brief` 时为 `publishedAt`、`read`、`title`、`sourceName`、`contentId`。
+
+> 同 `sub contents`：默认只返回未读，按时间浏览要加 `--all`。
+
+### `supsub focus mark-read` — 整个关注点标记已读
+
+| 选项 | 说明 |
+|---|---|
+| `--id <focusId>` | 必填 |
+| `--all` | **必填**，确认把整个关注点标为已读 |
+
+> 与 `sub mark-read` 同样的模型：**只有整体已读，没有单篇已读**，`--all` 必填且不可逆。传 `--content-id` / `--type` / `--source-type` 会以退出码 `64` 报错。
+
+### `supsub focus remove` — 删除关注点
+
+| 选项 | 说明 |
+|---|---|
+| `--id <focusId>` | 必填 |
+
+> **破坏性且不可逆**：CLI 没有新增关注点的命令，删掉只能回网页端重建。
+
+---
+
+## 4. 订阅分组 `group`
+
+分组 = 收纳已订阅源的「文件夹」，成员是**源**而不是文章。
+
+| 命令 | 功能 |
+|---|---|
+| `supsub group list` | 列出分组，输出列 `id`、`name` |
+| `supsub group add <name>` | 创建分组，返回新分组的 `id` / `name` |
+| `supsub group rename --id <id> --name <新名称>` | 重命名分组 |
+| `supsub group remove --id <id>` | 删除分组（**不可逆**；组内订阅源本身不受影响，只是不再归属该分组） |
+| `supsub group subs --id <id> [--all] [--type <t>]` | 查看分组订阅源 |
+| `supsub group add-sub --id <id> --source-id <sid> --type <t>` | 把订阅源加入分组 |
+| `supsub group remove-sub --id <id> --source-id <sid> --type <t>` | 把订阅源移出分组 |
+
+`group subs` 的两种模式：
+
+- **默认**（仅组内成员）：输出列 `sourceId`、`类型`、`name`、`unreadCount`、`description`。
+- **`--all`**（全部订阅源）：输出列 `sourceId`、`类型`、`name`、`inGroup`、`description`——后端在这个模式下**不返回** `unreadCount`，要未读数就用默认模式。
+- `--type` 可过滤类型，取值比订阅命令宽：`MP|WEBSITE|X|PODCAST|NEWSLETTER`（分组里可能有网页端加入的播客 / 通讯源）。
+
+> **`add-sub` / `remove-sub` 是「读-改-写全量覆盖」**：后端没有单个成员的原子增删端点，CLI 先拉取当前成员列表、改完再整份写回。因此**不要并发执行**，也不要在网页端同时编辑同一分组，否则后写入的一方会覆盖另一方的改动。
+>
+> **没有分组级标记已读命令。** 要「清空某个分组」，先 `group subs` 列出成员与各自未读数，确认后逐个执行 `sub mark-read --all`。
+
+---
+
+## 5. 未读概览 `unread`
+
+### `supsub unread` — 一条命令看全未读
+
+| 选项 | 说明 |
+|---|---|
+| `--all` | 显示全部（含 `unreadCount = 0` 的项）；默认只显示有未读的 |
+
+并发聚合「订阅源列表 + 关注点列表」，等价于 `sub list` + `focus list` 两查。输出分两段：
+
+- **订阅源**：`sourceId`、`类型`、`name`、`unreadCount`
+- **关注点**：`id`、`icon`、`title`、`unreadCount`
+
+> 配套的清未读动作只有 `sub mark-read --all` 与 `focus mark-read --all` 两条，均不可逆。
+
+---
+
+## 6. 搜索 `search`
 
 ### `supsub search <keyword>` — 全站搜索（源 + 文章）
 
@@ -86,9 +194,11 @@ supsub [全局选项] <命令> [子命令] [参数]
 
 输出同时包含「源」与「文章」两类结果，每条带类型、ID、名称/标题、域名、摘要。
 
+> 这是**全站**搜索，不限于自己的订阅。CLI 没有「在我的订阅范围内按关键词搜」的命令；限定到自己范围的请求走 `sub list` / `sub contents` / `focus list` / `focus contents` 浏览。
+
 ---
 
-## 4. 公众号 `mp`
+## 7. 公众号 `mp`
 
 | 命令 | 功能 |
 |---|---|
@@ -97,7 +207,7 @@ supsub [全局选项] <命令> [子命令] [参数]
 
 ---
 
-## 5. 自更新 `update` 与 Skills 同步 `skills`
+## 8. 自更新 `update` 与 Skills 同步 `skills`
 
 | 命令 | 功能 |
 |---|---|
@@ -134,7 +244,7 @@ skills 同步机制说明：
 
 ---
 
-## 6. 输出格式
+## 9. 输出格式
 
 - **`table`（默认）**：彩色表格，表头青色加粗；对中文/全角字符按 2 列宽度对齐，避免列错位。
 - **`-o json`**：向 stdout 输出 `{ "success": true, "data": ... }`，可直接 `jq` 处理。出错时输出 `{ "success": false, "error": {...} }`（同样在 stdout）。
@@ -143,7 +253,7 @@ skills 同步机制说明：
 
 ---
 
-## 7. 退出码
+## 10. 退出码
 
 | 退出码 | 含义 |
 |---|---|
@@ -155,11 +265,13 @@ skills 同步机制说明：
 | `11` | 服务端错误 |
 | `64` | 参数非法 |
 
+退出码 `64` 覆盖各命令的本地参数校验，典型场景：`--type` 取值不在枚举内、ID 不是正整数、`--all` 与 `--unread` 互斥冲突、`--page-size` 超出 `1`-`100`、`mark-read` 未给 `--all` 或误传单篇参数。这类错误在发请求**之前**抛出，不会产生任何副作用。
+
 可在脚本中据此判断结果，例如配合 `-o json` 做自动化。
 
 ---
 
-## 8. 环境变量
+## 11. 环境变量
 
 | 变量 | 作用 | 默认 |
 |---|---|---|
@@ -172,7 +284,7 @@ skills 同步机制说明：
 
 ---
 
-## 9. 凭证存储与优先级
+## 12. 凭证存储与优先级
 
 凭证保存在 `~/.supsub/config.json`（目录 `0700` / 文件 `0600`）。每次请求按以下优先级取凭证：
 

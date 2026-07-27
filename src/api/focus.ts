@@ -14,15 +14,31 @@ export async function listFocuses(): Promise<Focus[]> {
 export async function getFocusContents(params: {
   focusId: number;
   type: 'all' | 'unread';
+  page?: number;
+  pageSize?: number;
 }): Promise<FocusContent[]> {
   return request<FocusContent[]>({
     method: 'GET',
     path: `/api/focuses/${params.focusId}/contents`,
     query: {
       type: params.type,
-      page: 1,
-      pageSize: 20,
+      page: params.page ?? 1,
+      pageSize: params.pageSize ?? 20,
     },
+  });
+}
+
+/**
+ * POST /api/focuses/{focusId}/mark-as-read — 整个关注点标记已读（body 为 `{}`）。
+ *
+ * 后端也接受 contentId + sourceType 只标单篇，但 CLI 不暴露：文章没有「详情 / 阅读」这一步，
+ * 产生不了自然的单篇已读事件，只保留用户明确表达的整点已读。无 mark-as-unread，不可逆。
+ */
+export async function markFocusAsRead(params: { focusId: number }): Promise<void> {
+  await request<undefined>({
+    method: 'POST',
+    path: `/api/focuses/${params.focusId}/mark-as-read`,
+    body: {},
   });
 }
 
