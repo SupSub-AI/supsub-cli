@@ -41,3 +41,36 @@ export function isTokenExpiringSoon(token: string, skewMs = 60_000): boolean {
   if (expMs === undefined) return false;
   return Date.now() >= expMs - skewMs;
 }
+
+/**
+ * 解析 JWT 里的用户标识，用于给本地缓存目录分账号。
+ *
+ * 依次尝试 `id`（SupSub access_token 实际用的字段，2026-07-27 实测 payload 形如
+ * `{id, client, iat, exp}`）、`sub`、`userId`。解析不出返回 undefined，
+ * 调用方回落到「按凭证哈希分目录」。
+ *
+ * 同样不验签——只是拿来当目录名，不做任何鉴权判断。
+ */
+export function getTokenSubject(token: string): string | undefined {
+  const parts = token.split('.');
+  if (parts.length !== 3) return undefined;
+  const payload = parts[1];
+  if (!payload) return undefined;
+
+  try {
+    const b64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
+    const parsed = JSON.parse(Buffer.from(b64 + pad, 'base64').toString('utf-8')) as Record<
+      string,
+      unknown
+    >;
+    for (const field of ['id', 'sub', 'userId'] as const) {
+      const v = parsed[field];
+      if (typeof v === 'number' && Number.isFinite(v)) return String(v);
+      if (typeof v === 'string' && v.trim() !== '') return v.trim();
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}

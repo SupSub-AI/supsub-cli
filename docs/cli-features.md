@@ -184,7 +184,54 @@ supsub [全局选项] <命令> [子命令] [参数]
 
 ---
 
-## 6. 搜索 `search`
+## 6. 精读 `deepread`
+
+对**单篇**文章做 AI 深度拆解，产出「一句话本质 / 干货成色 / 核心要点 / 分节正文 / 编辑批注（背景·立场·来源可信度·最弱一环）」。
+
+> ⚠️ **按次消耗月度额度**（实测 `limit=100`），无退额度操作。已精读过的文章重复发起不会重复扣费。
+> ⚠️ 精读 ≠ 摘要（`sub contents` 的 `summary` 已是摘要），也 ≠ 全文（CLI 没有取原文的接口）。
+
+| 命令 | 功能 |
+|---|---|
+| `supsub deepread run` | 发起精读。先探测状态，`none`/`failed` 才真正发起；默认前台轮询到完成（实测 20~40 秒） |
+| `supsub deepread get` | 查看结果。`done` 是终态、结果不可变，默认直接用本地缓存（零请求） |
+| `supsub deepread list` | 本地精读队列（收件箱语义） |
+| `supsub deepread quota` | 本月额度 `{limit, used, remaining}` |
+| `supsub deepread share` | 生成分享链接 `<web>/s/<code>` |
+| `supsub deepread show` | 查看他人分享的精读（**无需登录**） |
+| `supsub deepread drop` | 从本地队列移除（服务端结果不受影响，之后 `get` 能重新拉回且不扣额度） |
+
+### `run` 选项
+
+| 选项 | 说明 | 默认 |
+|---|---|---|
+| `--type <MP\|WEBSITE\|X>` | 信息源类型 | 必填 |
+| `--content-id <cid>` | 内容 ID，来自 `sub contents` / `focus contents` / `search` | 必填 |
+| `--title` / `--source-name` / `--url` | 写入本地队列的展示信息 | 无 |
+| `--no-wait` | 只发起不等待 | 前台等待 |
+| `--timeout <sec>` | 等待上限，1–600 | `180` |
+| `--brief` | 省略正文 sections | 全量 |
+
+`status` 取值 `none` / `pending` / `done` / `failed`。**超时或仍 pending 不是错误，退出码仍为 `0`** —— 调用方按 `status` 字段分支。
+
+### 本地缓存 / 队列
+
+后端没有「列出我所有精读」的接口，裸发起的精读也**不会**进网页端的「稍后阅读」列表，所以 CLI 自建本地索引：
+
+```
+~/.supsub/deepread/<账号>/<TYPE>_<hash>.json   完整记录（元数据 + 精读结果）
+~/.supsub/deepread/<账号>/<TYPE>_<hash>.md     渲染好的 Markdown 全文
+```
+
+一条一个文件（并发发起不会互相覆盖），按账号分目录。`list` 默认只显示「进行中」+「完成但尚未播报过」的条目，播报后打水位线；`--all` 看全部历史且不动水位线。**队列是本机本地的**，与网页端、其它设备互不可见。
+
+### 分享
+
+`deepread share` 生成的 `<web>/s/<code>` 页面**任何人都能访问（无需登录）**，且当前 API 没有撤销接口。同一篇重复 share 复用已有分享码。Web 基址由 `SUPSUB_WEB_URL` 决定，未设时跟随 API 基址。
+
+---
+
+## 7. 搜索 `search`
 
 ### `supsub search <keyword>` — 全站搜索（源 + 文章）
 
@@ -198,7 +245,7 @@ supsub [全局选项] <命令> [子命令] [参数]
 
 ---
 
-## 7. 公众号 `mp`
+## 8. 公众号 `mp`
 
 | 命令 | 功能 |
 |---|---|
@@ -207,7 +254,7 @@ supsub [全局选项] <命令> [子命令] [参数]
 
 ---
 
-## 8. 自更新 `update` 与 Skills 同步 `skills`
+## 9. 自更新 `update` 与 Skills 同步 `skills`
 
 | 命令 | 功能 |
 |---|---|
@@ -244,7 +291,7 @@ skills 同步机制说明：
 
 ---
 
-## 9. 输出格式
+## 10. 输出格式
 
 - **`table`（默认）**：彩色表格，表头青色加粗；对中文/全角字符按 2 列宽度对齐，避免列错位。
 - **`-o json`**：向 stdout 输出 `{ "success": true, "data": ... }`，可直接 `jq` 处理。出错时输出 `{ "success": false, "error": {...} }`（同样在 stdout）。
@@ -253,7 +300,7 @@ skills 同步机制说明：
 
 ---
 
-## 10. 退出码
+## 11. 退出码
 
 | 退出码 | 含义 |
 |---|---|
@@ -271,20 +318,21 @@ skills 同步机制说明：
 
 ---
 
-## 11. 环境变量
+## 12. 环境变量
 
 | 变量 | 作用 | 默认 |
 |---|---|---|
 | `SUPSUB_API_KEY` | 注入 API Key（等价于 `--api-key`，但 flag 优先级更高） | 无 |
 | `SUPSUB_API_URL` | 覆盖 API 基址（等价于 `--api-url`，但 flag 优先级更高） | `https://supsub.net` |
+| `SUPSUB_WEB_URL` | 覆盖 Web 站点基址（仅用于拼精读分享链接 `/s/<code>`），无对应 flag | 回落到 API 基址 |
 | `SUPSUB_NO_BROWSER` | 真值时 `auth login` 不自动打开浏览器 | 未设 |
 | `SUPSUB_NO_SPINNER` | 真值时关闭所有 loading 动画（非 TTY 下本就不渲染） | 未设 |
 | `SUPSUB_NO_SKILLS_NOTIFIER` | 真值时关闭「本地 skills 落后」的启动提示 | 未设 |
-| `SUPSUB_CONFIG_DIR` | 覆盖配置目录（凭证存于 `<dir>/config.json`，状态存于 `<dir>/skills-state.json`） | `~/.supsub` |
+| `SUPSUB_CONFIG_DIR` | 覆盖配置目录（凭证存于 `<dir>/config.json`，状态存于 `<dir>/skills-state.json`，精读缓存存于 `<dir>/deepread/<账号>/`） | `~/.supsub` |
 
 ---
 
-## 12. 凭证存储与优先级
+## 13. 凭证存储与优先级
 
 凭证保存在 `~/.supsub/config.json`（目录 `0700` / 文件 `0600`）。每次请求按以下优先级取凭证：
 

@@ -169,3 +169,72 @@ export type UnreadOverview = {
   subscriptions: Subscription[];
   focuses: Focus[];
 };
+
+// ─── 精读（deep read）相关 ────────────────────────────────────
+/** 精读任务状态。none = 从未发起过 */
+export type DeepReadStatus = 'none' | 'pending' | 'done' | 'failed';
+
+/** 干货成色 / 来源可信度共用的「等级 + 说明」形态 */
+export type DeepReadGrade = {
+  grade: string; // 高 / 中 / 低
+  comment: string;
+};
+
+/** 精读正文的一节 */
+export type DeepReadSection = {
+  title: string;
+  markdown: string;
+};
+
+/** 编辑批注 */
+export type DeepReadAnnotations = {
+  background: string;
+  stance: string;
+  credibility: { grade: string; reason: string };
+  weakestLink: string;
+};
+
+/**
+ * 精读结果主体（prompt_version = v1）。
+ *
+ * ⚠️ 与 api.json 的两处出入（2026-07-27 实测）：
+ * 1. `version` 实际在响应**顶层**，不在 content 里 —— 这里标成可选，别依赖。
+ * 2. api.json 把所有字段标为 required，但旧数据 / 未来版本未必齐全，全部按可选防御。
+ */
+export type DeepReadContent = {
+  version?: string;
+  essence?: string;
+  quality?: DeepReadGrade;
+  keyPoints?: string[];
+  body?: { sections?: DeepReadSection[] };
+  annotations?: DeepReadAnnotations;
+};
+
+/** GET /api/deep-reads 的响应 */
+export type DeepReadResponse = {
+  status: DeepReadStatus;
+  version?: string;
+  content?: DeepReadContent;
+};
+
+/** GET /api/deep-reads/quota 的响应 */
+export type DeepReadQuota = {
+  limit: number;
+  used: number;
+  remaining: number;
+};
+
+/**
+ * GET /api/deep-reads/shared?code= 的响应（公开，无需鉴权）。
+ *
+ * ⚠️ api.json 用 allOf 把精读结果**平铺**在文章信息旁边，实测不是：
+ * 精读结果嵌在 `content` 里，与 GET /api/deep-reads 同构（2026-07-27 实测）。
+ */
+export type SharedDeepRead = {
+  url: string;
+  title: string;
+  coverImage: string;
+  summary: string;
+  version?: string;
+  content?: DeepReadContent;
+};
