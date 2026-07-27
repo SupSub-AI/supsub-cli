@@ -14,6 +14,9 @@ export type ErrorEnvelope = {
 export function exitCodeFor(envelope: ErrorEnvelope): number {
   switch (envelope.code) {
     case 'UNAUTHORIZED':
+    // refreshToken 失效等价于「需要重新登录」，共用 exit code 2。
+    // 正常路径下它会被 http/client.ts 转成 UNAUTHORIZED，这里是兜底。
+    case 'INVALID_REFRESH_TOKEN':
       return EXIT.UNAUTHORIZED;
     case 'SUBSCRIPTION_PLAN_EXPIRED':
       return EXIT.PLAN_EXPIRED;
