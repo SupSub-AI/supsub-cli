@@ -6,6 +6,14 @@ import pkg from '../../package.json' with { type: 'json' };
 import { registerAuthLogin } from '../commands/auth/login.ts';
 import { registerAuthLogout } from '../commands/auth/logout.ts';
 import { registerAuthStatus } from '../commands/auth/status.ts';
+// Deep read commands
+import { registerDeepReadDrop } from '../commands/deepread/drop.ts';
+import { registerDeepReadGet } from '../commands/deepread/get.ts';
+import { registerDeepReadList } from '../commands/deepread/list.ts';
+import { registerDeepReadQuota } from '../commands/deepread/quota.ts';
+import { registerDeepReadRun } from '../commands/deepread/run.ts';
+import { registerDeepReadShare } from '../commands/deepread/share.ts';
+import { registerDeepReadShow } from '../commands/deepread/show.ts';
 // Focus commands
 import { registerFocusContents } from '../commands/focus/contents.ts';
 import { registerFocusList } from '../commands/focus/list.ts';
@@ -141,6 +149,16 @@ export async function run(): Promise<void> {
 
   // ─── unread 命令（未读概览） ──────────────────────────────
   registerUnread(program);
+
+  // ─── deepread 子命令树（精读） ────────────────────────────
+  const deepread = program.command('deepread').description('精读（AI 深度拆解单篇文章）');
+  registerDeepReadRun(deepread);
+  registerDeepReadGet(deepread);
+  registerDeepReadList(deepread);
+  registerDeepReadQuota(deepread);
+  registerDeepReadShare(deepread);
+  registerDeepReadDrop(deepread);
+  registerDeepReadShow(deepread);
 
   // ─── skills 子命令树（同步本地 Agent Skills） ────────────
   registerSkills(program);

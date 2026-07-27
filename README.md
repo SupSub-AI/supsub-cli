@@ -176,6 +176,31 @@ supsub search <keyword>             全量搜索（订阅源 + 文章）
   --type <ALL|MP|WEBSITE|CONTENT>   搜索范围，默认 ALL
 ```
 
+### 精读
+
+```
+supsub deepread run                 对单篇文章做 AI 深度拆解（默认前台等待，实测 20~40s）
+  --type <MP|WEBSITE|X>             信息源类型
+  --content-id <cid>                内容 ID（来自 sub contents / focus contents / search）
+  --title / --source-name / --url   写入本地队列的展示信息（建议总是带上）
+  --no-wait                         只发起不等待（批量排队时用）
+  --timeout <sec>                   等待上限，默认 180
+  --brief                           省略正文 sections，只留本质/成色/要点/批注
+supsub deepread get                 查看精读结果（优先本地缓存，--refresh 强制回源，--out 导出 Markdown）
+supsub deepread list                本地精读队列（--wait 等全部落定，--all 看全部历史）
+supsub deepread quota               本月精读额度余额
+supsub deepread share               生成分享链接（公开可访问、暂不可撤销）
+supsub deepread show --share-code   查看他人分享的精读（无需登录）
+supsub deepread drop                从本地队列移除（不影响服务端结果）
+```
+
+> **精读按次消耗月度额度**（实测 100 次/月），且没有退额度的操作 —— agent 集成务必在发起前
+> 先 `deepread quota` 并与用户确认。已精读过的文章重复 `run` 不会重复扣费（命中缓存直接返回）。
+>
+> 结果结构：一句话本质 / 干货成色 / 核心要点 / 分节正文 / 编辑批注（背景·立场·来源可信度·最弱一环）。
+> 每篇会在 `~/.supsub/deepread/<账号>/` 落一份 `.json`（完整记录）+ `.md`（渲染好的全文）；
+> 队列是**本机本地**的，与网页端的「稍后阅读」互不可见。
+
 ### 公众号
 
 ```
@@ -227,6 +252,7 @@ supsub skills list                  列出本仓库提供的 skills
 | 变量 | 说明 |
 |------|------|
 | `SUPSUB_API_URL` | API 基地址（同 `--api-url`，命令行 flag 优先级更高） |
+| `SUPSUB_WEB_URL` | Web 站点基地址，用于拼精读分享链接 `/s/<code>`；未设时跟随 API 基址 |
 | `SUPSUB_NO_BROWSER` | 设为真值时 `auth login` 不自动打开浏览器（无头 / e2e 环境用） |
 | `SUPSUB_NO_SPINNER` | 设为真值时关闭所有 loading 动画（非 TTY 下本就不渲染） |
 | `SUPSUB_NO_SKILLS_NOTIFIER` | 设为真值时关闭「本地 skills 落后」的启动提示 |
@@ -243,6 +269,7 @@ supsub skills list                  列出本仓库提供的 skills
 | supsub-sub | `sub list` / `sub add` / `sub remove` / `sub contents` / `sub mark-read` |
 | supsub-search | `search <keyword>` |
 | supsub-mp | `mp search` / `mp search-cancel` |
+| supsub-deepread | `deepread run` / `get` / `list` / `quota` / `share` / `drop` / `show` |
 | supsub-focus | `focus list` / `focus contents` / `focus mark-read` / `focus remove` |
 | supsub-group | `group list` / `add` / `rename` / `remove` / `subs` / `add-sub` / `remove-sub` |
 | supsub-unread | `unread` + 未读工作流（钻取未读列表 → `sub` / `focus mark-read --all` 整体已读） |

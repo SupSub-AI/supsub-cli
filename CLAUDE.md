@@ -18,10 +18,13 @@ This section is the authoritative routing table for **end-user-style natural-lan
 | 我还有什么没读 / 有多少未读 / 未读概览 / 帮我清未读 / 这个号（这个关注点）我读完了 | `supsub-unread` | `supsub unread`；`supsub sub mark-read --all`；`supsub focus mark-read --all`（**只有整源/整关注点一档，无单篇已读**；不可逆、无取消已读，执行前必须二次确认） |
 | **搜文章 / 搜内容 / 关键词找文章 / 全文搜 / 「搜一下 X」 / 「搜 X 相关的内容」** | `supsub-search` | `supsub search <kw> [--type ALL\|MP\|WEBSITE\|CONTENT]` |
 | **发现一个具体公众号账号 / 「找 XXX 这个公众号」 / 想订阅某公众号但不知道 ID** | `supsub-mp` | `supsub mp search <name>` → 拿 `mpId` → `supsub sub add --mp-id <mpId>` |
+| **精读某一篇 / 「深读一下这篇」「帮我拆解这篇」「这篇靠不靠谱 / 有没有干货」「把这几篇都精读了出份简报」/ 「昨天那篇精读好了吗」** | `supsub-deepread` | `supsub deepread run --type <t> --content-id <cid>`；`deepread list` / `quota` / `share`（**扣月度额度，发起前必须确认**；contentId 必须来自上下文） |
 
 > **订阅源（sub）vs 关注点（focus）vs 分组（group）** —— 三者都跟「我在追的东西」有关，但不同：**订阅源**是具体的一个号（公众号 / 网站 / 推特账号），按 `sourceId`+`sourceType` 操作；**关注点**是用户自定义的主题/关注方向（带 AI 聚合，列表项形如 `{id, icon, title}`，如「Agent 行业落地」），按 `focus id` 操作；**分组**是把已订阅的源收纳起来的「文件夹」（列表项形如 `{id, name}`），成员是源而不是文章，按 `group id` 操作。**判别动词**：「订阅 / 订阅了」→ `supsub-sub`（订阅源）；「关注 / 关注了 / 关注点」→ `supsub-focus`（关注点）；「分组 / 分类 / 文件夹 / 归到…里」→ `supsub-group`。即「我订阅了哪些」→ `supsub-sub`；「我关注了哪些」「我的关注点」→ `supsub-focus`；「我的分组」「把量子位加到 AI 分组」→ `supsub-group`。
 >
 > **未读（unread）的归属** —— 「我还有什么没读 / 清未读 / 标记已读」这类**跨源的未读工作流**走 `supsub-unread`（`supsub unread` 一条命令聚合订阅源 + 关注点的未读数）。若用户已限定到具体对象（「这个号还有几篇没看」「这个分组多少未读」），也可直接读 `sub list` / `focus list` / `group subs` 里的 `unreadCount` 字段。**标记已读只有 `sub mark-read --all`（整源）/ `focus mark-read --all`（整个关注点）两条路径，`--all` 必填且不可逆。没有单篇已读**——文章没有「详情 / 阅读」这一步，产生不了自然的单篇已读事件，用户要标单篇时如实说明并改问是否整源已读；**也没有分组级已读**，要清分组就 `group subs` 列出成员后逐个源确认执行。
+>
+> **精读（deepread）的边界** —— 「精读 / 深读 / 拆解这篇 / 这篇靠不靠谱」走 `supsub-deepread`，它对**单篇**文章做 AI 深度拆解（本质 / 干货成色 / 要点 / 分节正文 / 立场·可信度·最弱一环批注）。三条容易搞混的界线：**① 精读 ≠ 摘要** —— 只想知道「讲了啥」时 `sub contents` 返回里现成的 `summary` 就够，别为此花额度；**② 精读 ≠ 全文** —— CLI 没有取原文的接口，用户要原文就给 `url`；**③ 精读要花钱** —— 按次扣月度额度（实测 100 次/月）且不可撤销，发起前必须 `deepread quota` + 向用户复述消耗并取得同意。另外 `contentId` 只能来自本轮上下文里 contents / search 的返回，匹配不到就回问，**绝不猜**。
 >
 > **⚠️ 字母「X」的两种含义** —— 路由示例里用「X」「XXX」当**占位符**代指用户的真实词/账号名（如「搜 X」「找 XXX 这个公众号」），它**不是**类型；而 `sub --type X` 里的 `X` 是真实 sourceType，专指**推特/Twitter 平台账号**（后端只认 `X`，不认 `TWITTER`）。只有用户**明确提到推特/Twitter/X 平台**时才用 `--type X`；「订阅 X」「X 公众号」这类占位用法不要推断成 `--type X`。
 >
@@ -88,9 +91,11 @@ These conventions are enforced by the existing structure — new code must follo
 - **Errors are `ErrorEnvelope` objects** (`src/lib/errors.ts`) with semantic exit codes from `src/lib/exit-code.ts`: `0` OK, `2` UNAUTHORIZED, `3` PLAN_EXPIRED, `10` NETWORK, `11` SERVER, `64` INVALID_ARGS. Callers may rely on these — do not change the mapping casually.
 - **Commands follow the `register<Name>(parent: Command)` pattern** — see existing files in `src/commands/` for the shape.
 
-## API base URL
+## API / Web base URL
 
 Defaults to `https://supsub.net`. Override with the `--api-url` global flag or the `SUPSUB_API_URL` env var (flag wins; both resolved in `src/lib/api-url.ts` via `getApiUrl()`, with the flag injected through `setCliApiUrl` in the `preAction` hook). Use this for local API server testing.
+
+**Web 基址**（拼给人点的链接，目前只有精读分享页 `/s/<code>`）单独走 `src/lib/web-url.ts` 的 `getWebUrl()`：`SUPSUB_WEB_URL` 环境变量 > 回落到 API 基址。故意不共用 `--api-url` flag —— 两者语义不同，混在一起会让「改了 api-url 却没改 web 域名」难查。新增/修改这两个 env 时记得同步 `README.md` 与 `docs/cli-features.md` 的环境变量表。
 
 ## Config file
 
