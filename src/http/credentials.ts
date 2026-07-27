@@ -18,6 +18,12 @@ type ResolvedCredentials = {
   key?: string;
   clientId?: string;
   /**
+   * 与当前 key 配套的刷新令牌，**仅当 key 取自 config 的 access_token 时才有值**。
+   * flag / env / api_key / bearer_token 这几种来源没有续期通道，也不该被自动续期，
+   * 所以这里为 undefined —— http/token-refresh.ts 以此判断「能不能续期」。
+   */
+  refreshToken?: string;
+  /**
    * 当前 key 的来源：
    * - flag    → `--api-key` 命令行 flag
    * - env     → `SUPSUB_API_KEY` 环境变量
@@ -54,6 +60,7 @@ export async function resolveApiKey(): Promise<ResolvedCredentials> {
       key: cfg.access_token,
       clientId: cfg.client_id ?? 'supsub-cli',
       source: 'config',
+      refreshToken: cfg.refresh_token,
     };
   }
   if (cfg.api_key) {

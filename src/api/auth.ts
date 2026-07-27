@@ -99,3 +99,82 @@ export async function pollDeviceToken(deviceCode: string): Promise<DeviceTokenRe
     refreshToken,
   };
 }
+
+// ─── 令牌续期（Refresh Token）────────────────────────────────
+// access_token 有效期约 24h、refresh_token 约 14d（实测 JWT exp）。
+// 续期端点同样不走统一 request()，理由见下方函数注释。
+
+/** POST /api/auth/tokens 的成功响应：一对新令牌 */
+export type RefreshTokenResult = {
+  accessToken: string;
+  refreshToken: string;
+};
+
+/**
+ * POST /api/auth/tokens — 用 refreshToken 换一对新令牌（免鉴权头，凭 body 里的 refreshToken）
+ *
+ * 同样不走统一 request()，原因有二：
+ * 1. 它本身就是「请求收到 401」的补救手段，走 request() 会递归触发「401 → 续期」；
+ * 2. 必须把「refreshToken 已失效」和「网络/服务端抖动」区分开——前者要求用户重新
+ *    登录，后者只是稍后重试，绝不能因为一次网络闪断就把用户登出。
+ *
+ * 抛错约定（由 http/token-refresh.ts 判定）：
+ * - 400 / 401  → `INVALID_REFRESH_TOKEN`，令牌已失效，不可重试
+ * - 其余非 2xx → `SERVER_ERROR`，可重试
+ * - fetch 抛错 → `NETWORK_ERROR`，可重试
+ *
+ * 实测（https://supsub.net，2026-07）：
+ * - 成功时返回 **201**（api.json 标的是 200），所以这里用 `res.ok` 判成功，别写死 200；
+ * - refreshToken 非法 → 401 `{"code":"Unauthorized","message":"无效的令牌","status":401}`；
+ * - refreshToken 长度不足 41 字符 → 400 Validation error；
+ * - 换新令牌后**旧 refreshToken 在有效期内仍然可用**（服务端不作废旧的）。
+ *
+ * 字段名容错：与 device/token 一致，camelCase / snake_case 都接受。
+ * 响应若没带回新的 refreshToken，沿用传入的那个。
+ */
+export async function refreshTokens(refreshToken: string): Promise<RefreshTokenResult> {
+  const apiUrl = getApiUrl();
+
+  let res: Response;
+  try {
+    res = await fetch(`${apiUrl}/api/auth/tokens`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+  } catch (err) {
+    throw {
+      code: 'NETWORK_ERROR',
+      message: '网络异常，令牌续期失败',
+      status: 0,
+      data: String(err),
+    } satisfies ErrorEnvelope;
+  }
+
+  if (res.status === 400 || res.status === 401) {
+    throw {
+      code: 'INVALID_REFRESH_TOKEN',
+      message: '登录已过期，请重新运行 supsub auth login',
+      status: res.status,
+    } satisfies ErrorEnvelope;
+  }
+  if (!res.ok) {
+    throw {
+      code: 'SERVER_ERROR',
+      message: '令牌续期失败，请稍后重试',
+      status: res.status,
+    } satisfies ErrorEnvelope;
+  }
+
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  const accessToken = (body.accessToken ?? body.access_token) as string | undefined;
+  const nextRefreshToken = (body.refreshToken ?? body.refresh_token) as string | undefined;
+  if (!accessToken) {
+    throw {
+      code: 'SERVER_ERROR',
+      message: '令牌续期响应缺少 accessToken',
+      status: res.status,
+    } satisfies ErrorEnvelope;
+  }
+  return { accessToken, refreshToken: nextRefreshToken ?? refreshToken };
+}

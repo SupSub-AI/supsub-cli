@@ -1,6 +1,6 @@
 ---
 name: supsub-auth
-version: 0.1.1
+version: 0.1.2
 description: SupSub CLI 认证管理 —— 登录 / 登出 / 查看登录状态。登录走 OAuth 浏览器设备授权，CLI 不支持 API Key 登录。匹配「supsub 登录」「supsub 登出」「查看我在 supsub 的登录状态」「我现在 supsub 用的是哪个账号」「supsub auth login / logout / status」。在调用其他 supsub 子命令前，如不确定凭证状态可先用本 skill 跑 `supsub auth status`。
 ---
 
@@ -12,6 +12,7 @@ Log in, log out, and check authentication status for the SupSub CLI.
 
 - 安装：`pnpm add -g @supsub/cli`（或 `npm i -g @supsub/cli`）
 - 登录凭证保存在 `~/.supsub/config.json`（目录权限 0700，文件权限 0600）。`supsub auth login` 走 OAuth 设备授权，成功后写入 `access_token` / `refresh_token`。**CLI 不支持 API Key 登录**，没有 `--api-key` flag / `SUPSUB_API_KEY` 这一类入口。
+- **令牌会自动续期**：`access_token` 约 24 小时到期，CLI 在过期前（或收到 401 时）用 `refresh_token` 自动换新令牌并写回配置文件，全程无感。`refresh_token` 约 14 天有效，只有它也失效时才需要重新 `supsub auth login`。
 
 ## Commands
 
@@ -90,6 +91,9 @@ JSON 模式下输出 `{"success":true,"data":{}}`。
 - **未登录 / 任意命令返回 exit 2（UNAUTHORIZED）时不要止步于告知用户「未登录」**：直接运行 `supsub auth login` 为用户打开浏览器授权（命令会自动打开浏览器并阻塞等待授权，请用足够长的超时，如 10 分钟；用户只需在浏览器点确认，无需在终端输入任何内容），授权成功后重试原命令。无浏览器 / 无头环境再回退为提示用户 `SUPSUB_NO_BROWSER=1 supsub auth login`。
 - CLI **不支持 API Key 登录**，也没有 `--api-key` flag / `SUPSUB_API_KEY` 环境变量；登录唯一入口是 `supsub auth login`（OAuth 设备授权）。
 - 请求所用 Bearer 凭证由 `resolveApiKey()` 解析，优先级（高 → 低）：配置文件 `access_token`（OAuth 设备授权令牌）> 配置文件 `bearer_token`（高级用法：手动从浏览器粘贴的临时会话 token）。
-- 401 响应会自动清除本地存储的全部凭证（`access_token` / `refresh_token` / `bearer_token`，见 `src/http/client.ts` 调用的 `clearAuth()`）；遇到 exit code `2` 时通常需要重新登录。
+- 401 响应会**先尝试自动续期**（用 `refresh_token` 换新令牌后重试原请求，见 `src/http/token-refresh.ts`）：
+  - 续期成功 → 命令正常返回，用户无感，无需重新登录；
+  - `refresh_token` 也已失效 → 清除全部凭证（`clearAuth()`）并以 exit code `2` 退出，此时才需要重新 `supsub auth login`；
+  - 续期请求本身网络异常 / 服务端 5xx → **凭证保留不清**，以 exit code `10`（NETWORK）退出，让用户稍后重试即可，**不要**据此让用户重新登录。
 - 解析 JSON 时使用 `-o json`；常见 exit code：`0` OK，`2` UNAUTHORIZED，`3` PLAN_EXPIRED，`10` NETWORK，`11` SERVER，`64` INVALID_ARGS。
 - 自定义 API base URL：设置 `SUPSUB_API_URL`（默认 `https://supsub.net`），用于本地或测试环境。
