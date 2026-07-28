@@ -13,8 +13,8 @@ hero:
       text: 命令参考
       link: /reference/
     - theme: alt
-      text: GitHub
-      link: https://github.com/SupSub-AI/supsub-cli
+      text: 访问 SupSub
+      link: https://supsub.net
 
 features:
   - title: 订阅、关注点、分组

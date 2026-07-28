@@ -2,6 +2,9 @@ import { defineConfig } from 'vitepress'
 
 const REPO = 'https://github.com/SupSub-AI/supsub-cli'
 
+// SupSub 主站——CLI 只是它的一个入口，注册与 Web 端使用都在这里
+const SITE = 'https://supsub.net'
+
 // 部署在 GitHub Pages 项目路径下：https://supsub-ai.github.io/supsub-cli/
 // themeConfig 里的链接由 VitePress 自动补 base，但 head 里的是原样输出，
 // 必须手动拼——所以抽成常量，避免改 base 时漏掉 favicon。
@@ -55,10 +58,7 @@ export default defineConfig({
       { text: '指南', link: '/guide/getting-started', activeMatch: '/guide/' },
       { text: '命令参考', link: '/reference/', activeMatch: '/reference/' },
       { text: 'AI 助手', link: '/agents/', activeMatch: '/agents/' },
-      {
-        text: 'npm',
-        link: 'https://www.npmjs.com/package/@supsub/cli',
-      },
+      { text: 'SupSub 官网', link: SITE },
     ],
 
     sidebar: {
@@ -126,8 +126,8 @@ export default defineConfig({
     },
 
     footer: {
-      message: '基于 MIT 许可发布',
-      copyright: `Copyright © 2025-present SupSub`,
+      message: `基于 MIT 许可发布 · <a href="${SITE}" target="_blank" rel="noreferrer">SupSub 官网</a>`,
+      copyright: `Copyright © 2025-present <a href="${SITE}" target="_blank" rel="noreferrer">SupSub</a>`,
     },
 
     search: {
