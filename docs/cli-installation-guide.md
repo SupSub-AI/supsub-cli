@@ -1,10 +1,6 @@
 # SupSub CLI：Agent 安装与配置指南
 
-> **本文的读者是 AI agent**（Claude Code / Cursor / Codex 等）。用户会用类似这样的一句话把你带到这里：
->
-> 「请阅读本文并据此帮我安装并配置 SupSub CLI」
->
-> 人类读者请改看文档站《安装》：<https://supsub-ai.github.io/supsub-cli/guide/installation>
+> 本文是供 AI agent 替用户执行的安装 runbook；人类读者请看文档站《安装》：<https://supsub-ai.github.io/supsub-cli/guide/installation>
 
 ## 执行纪律（先读完再动手）
 

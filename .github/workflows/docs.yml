@@ -9,6 +9,9 @@ on:
     # 由 pnpm-lock.yaml 兜住，它不记录本包自身的 version，不会被版本号误触发。
     paths:
       - 'docs/**'
+      # cli-installation-guide.md 只走 raw URL 供 agent 抓取，已被 srcExclude
+      # 排除在站点外——改它重建出的站点一字不差，排除掉避免空跑。
+      - '!docs/cli-installation-guide.md'
       - '.github/workflows/docs.yml'
       - 'pnpm-lock.yaml'
   workflow_dispatch:
