@@ -16,8 +16,11 @@ export type SkillsDrift = {
   target: string;
 };
 
-/** 与 spinner.ts 同语义：空串 / '0' / 'false' 视为假，其余非空视为真 */
-function isTruthyEnv(value: string | undefined): boolean {
+/**
+ * 与 spinner.ts 同语义：空串 / '0' / 'false' 视为假，其余非空视为真。
+ * 导出供自动更新（auto-update.ts）复用同一套「真值」判定，避免另起一套语义。
+ */
+export function isTruthyEnv(value: string | undefined): boolean {
   if (!value) return false;
   const v = value.trim().toLowerCase();
   return v !== '' && v !== '0' && v !== 'false';
@@ -28,8 +31,11 @@ function normalize(version: string): string {
   return version.trim().replace(/^v/i, '');
 }
 
-/** 是否处于 CI 环境（CI 里不该弹同步提示，避免污染日志 / 阻断流水线） */
-function isCIEnv(): boolean {
+/**
+ * 是否处于 CI 环境（CI 里不该弹同步提示，避免污染日志 / 阻断流水线）。
+ * 导出供自动更新复用——CI / agent 环境同样绝不后台自动更新。
+ */
+export function isCIEnv(): boolean {
   return isTruthyEnv(process.env.CI) || isTruthyEnv(process.env.CONTINUOUS_INTEGRATION);
 }
 
