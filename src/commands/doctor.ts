@@ -33,6 +33,8 @@ function describeMethod(method: InstallMethod): string {
       return 'npm（包管理器全局目录，手动更新）';
     case 'dev':
       return 'dev（bun 跑源码）';
+    case 'manual':
+      return 'manual（手装独立二进制，手动更新；若在 ~/.local/bin 下次 supsub update 会自动迁到 native）';
   }
 }
 

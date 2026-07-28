@@ -86,8 +86,8 @@ describe('shouldScheduleAutoUpdate', () => {
     expect(gate).toEqual({ ok: false, reason: 'json' });
   });
 
-  test('非 native 安装 → not-native', () => {
-    for (const method of ['npm', 'dev'] as const) {
+  test('非 native 安装（npm / dev / manual）→ not-native', () => {
+    for (const method of ['npm', 'dev', 'manual'] as const) {
       const gate = shouldScheduleAutoUpdate({
         isJson: false,
         method,

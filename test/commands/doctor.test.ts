@@ -37,7 +37,7 @@ describe('commands/doctor - json 输出', () => {
     const parsed = JSON.parse(stdoutOutput);
     expect(parsed.success).toBe(true);
     expect(parsed.data.version).toBe(CURRENT_VERSION);
-    expect(['native', 'npm', 'dev']).toContain(parsed.data.installMethod);
+    expect(['native', 'npm', 'dev', 'manual']).toContain(parsed.data.installMethod);
     expect(typeof parsed.data.realBinary).toBe('string');
     // 自动更新块：默认通道 latest
     expect(parsed.data.autoUpdate.channel).toBe('latest');

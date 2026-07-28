@@ -106,13 +106,38 @@ assert_not_scheduled "CI=1"
 reset_layout; place "$VER" link
 env -u CI SUPSUB_DISABLE_AUTOUPDATER=1 "$SUPSUB_BIN_DIR/supsub" auth status >/dev/null 2>&1
 assert_not_scheduled "SUPSUB_DISABLE_AUTOUPDATER=1"
-# npm 方式（二进制在 versions/ 之外，DATA_DIR 指向空目录）
-reset_layout; mkdir -p "$WORK/npmbin" "$SUPSUB_CONFIG_DIR"; cp "$BIN" "$WORK/npmbin/supsub"
-env -u SUPSUB_DISABLE_AUTOUPDATER -u CI SUPSUB_DATA_DIR="$WORK/emptydata" "$WORK/npmbin/supsub" auth status >/dev/null 2>&1
-assert_not_scheduled "npm 方式"
-if env SUPSUB_DATA_DIR="$WORK/emptydata" "$WORK/npmbin/supsub" -o json doctor 2>/dev/null | jq -e '.data.installMethod=="npm"' >/dev/null; then
+# npm 方式（真实路径穿过 node_modules，由包管理器管理 → 判 npm，永不迁移、不调度）
+reset_layout; NPM_ROOT="$WORK/npmroot/node_modules/@supsub/cli/bin"
+mkdir -p "$NPM_ROOT" "$SUPSUB_CONFIG_DIR"; cp "$BIN" "$NPM_ROOT/supsub"; chmod 0755 "$NPM_ROOT/supsub"
+env -u SUPSUB_DISABLE_AUTOUPDATER -u CI SUPSUB_DATA_DIR="$WORK/emptydata" "$NPM_ROOT/supsub" auth status >/dev/null 2>&1
+assert_not_scheduled "npm 方式（node_modules）"
+if env SUPSUB_DATA_DIR="$WORK/emptydata" "$NPM_ROOT/supsub" -o json doctor 2>/dev/null | jq -e '.data.installMethod=="npm"' >/dev/null; then
   ok "npm 方式：doctor 报 installMethod=npm"
 else bad "npm 方式：doctor 未报 npm"; fi
+
+head "手装 manual：bin 位普通文件（被困手装用户）→ doctor 报 manual、rollback 拒绝、不调度"
+# 复刻 0.4.0 之前 curl 装的形态：native 的 symlink 位放一个普通文件（不在 versions/ 下）。
+# 离线 harness 只验证「状态判定 + 拒绝 + 不调度」，不跑真 update（真迁移需联网下载，见单测覆盖）。
+reset_layout; mkdir -p "$SUPSUB_BIN_DIR" "$SUPSUB_CONFIG_DIR"
+cp "$BIN" "$SUPSUB_BIN_DIR/supsub"; chmod 0755 "$SUPSUB_BIN_DIR/supsub"
+[ -L "$SUPSUB_BIN_DIR/supsub" ] && bad "bin 位本应是普通文件却成了 symlink" || ok "bin 位是普通文件（未链接）"
+if "$SUPSUB_BIN_DIR/supsub" -o json doctor 2>/dev/null | jq -e '.data.installMethod=="manual"' >/dev/null; then
+  ok "doctor 报 installMethod=manual"
+else bad "doctor 未报 manual"; fi
+# rollback 必须被拒绝（manual 非 native）：exit 1 + 文案提示仅支持 native
+out="$("$SUPSUB_BIN_DIR/supsub" update --rollback 2>&1)"; code=$?
+if [ "$code" = 1 ] && printf '%s' "$out" | grep -q 'native'; then
+  ok "rollback 拒绝：exit1 + 提示仅支持 native"
+else bad "rollback 未如期拒绝：exit=$code：$out"; fi
+jout="$("$SUPSUB_BIN_DIR/supsub" -o json update --rollback 2>/dev/null)"
+if printf '%s' "$jout" | jq -e '.error.code=="UPDATE_FAILED"' >/dev/null 2>&1; then
+  ok "json: rollback code=UPDATE_FAILED"
+else bad "rollback json 码不符：$jout"; fi
+# 后台自动更新不调度（manual 非 native）
+env -u SUPSUB_DISABLE_AUTOUPDATER -u CI "$SUPSUB_BIN_DIR/supsub" auth status >/dev/null 2>&1
+assert_not_scheduled "手装 manual（bin 位）"
+# 离线 harness 全程未触发真迁移，普通文件应原样健在（仍非 symlink）
+[ -L "$SUPSUB_BIN_DIR/supsub" ] && bad "普通文件竟被改成 symlink（离线 harness 不应触发真迁移）" || ok "普通文件原样健在"
 
 printf '\n\033[1m结果：%d 通过，%d 失败\033[0m\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

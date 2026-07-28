@@ -1,15 +1,18 @@
 // lib/install-layout：安装方式判定、版本并存列举、symlink 原子切换、旧版本清理、
-// 回滚目标、PATH 判断。用 SUPSUB_DATA_DIR / SUPSUB_BIN_DIR 把布局隔离到 tmp，
-// 不碰真实 ~/.local。（installNativeVersion 需真网络下载，不在此单测。）
+// 回滚目标、PATH 判断、迁移策略与「装到 versions/ + 切 symlink」的落盘链路。
+// 用 SUPSUB_DATA_DIR / SUPSUB_BIN_DIR 把布局隔离到 tmp，不碰真实 ~/.local。
+// （installNativeVersion 的真实网络下载通过注入假下载器规避，不连网。）
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   detectInstallMethod,
+  installNativeVersion,
   isBinDirOnPath,
   listInstalledVersions,
   planRollback,
+  planUpdateStrategy,
   previousInstalledVersion,
   pruneVersions,
   readLinkedVersion,
@@ -59,8 +62,53 @@ describe('detectInstallMethod', () => {
     expect(detectInstallMethod('/opt/homebrew/bin/bun')).toBe('dev');
     expect(detectInstallMethod('/usr/local/bin/node')).toBe('dev');
   });
-  test('其他路径（包管理器全局 bin）→ npm', () => {
+  test('真实路径含 node_modules（包管理器全局 bin）→ npm', () => {
     expect(detectInstallMethod('/usr/local/lib/node_modules/@supsub/cli/bin/supsub')).toBe('npm');
+  });
+  test('独立普通二进制（非 versions/ / 非 bun·node / 无 node_modules）→ manual', () => {
+    // 0.4.0 之前 curl 装的普通文件、手动 cp 到某处的 binary，都归 manual。
+    expect(detectInstallMethod('/usr/local/bin/supsub')).toBe('manual');
+    expect(detectInstallMethod('/home/alice/.local/bin/supsub')).toBe('manual');
+    // 语义翻转记录：直接跑 dist/supsub 现在判 manual（原先判 npm）。
+    expect(detectInstallMethod('/repo/dist/supsub')).toBe('manual');
+  });
+});
+
+describe('planUpdateStrategy', () => {
+  test('native 布局 → native', () => {
+    const bin = versionBinary('0.4.0');
+    expect(planUpdateStrategy(bin)).toBe('native');
+  });
+
+  test('普通文件恰在 native symlink 位（被困手装用户）→ migrate-to-native', () => {
+    const link = symlinkPath();
+    fs.mkdirSync(path.dirname(link), { recursive: true });
+    fs.writeFileSync(link, '#!/bin/sh\necho fake\n', { mode: 0o755 });
+    // 前提：这个普通文件确实被判为 manual
+    expect(detectInstallMethod(link)).toBe('manual');
+    expect(planUpdateStrategy(link)).toBe('migrate-to-native');
+  });
+
+  test('手拷到别处（不在 bin 位）的普通文件 → in-place（不迁移）', () => {
+    const stray = path.join(tmpRoot, 'usr-local-bin', 'supsub');
+    fs.mkdirSync(path.dirname(stray), { recursive: true });
+    fs.writeFileSync(stray, 'x', { mode: 0o755 });
+    expect(detectInstallMethod(stray)).toBe('manual');
+    expect(planUpdateStrategy(stray)).toBe('in-place');
+  });
+
+  test('npm 包（node_modules）→ in-place（不迁移，避免 PATH 遮蔽与包残留）', () => {
+    expect(planUpdateStrategy('/usr/local/lib/node_modules/@supsub/cli/bin/supsub')).toBe(
+      'in-place',
+    );
+  });
+
+  test('Windows 平台一律不迁移（native 布局仅 macOS/Linux）→ in-place', () => {
+    const link = symlinkPath();
+    fs.mkdirSync(path.dirname(link), { recursive: true });
+    fs.writeFileSync(link, 'x', { mode: 0o755 });
+    // 即便普通文件恰在 bin 位，win32 也走原地覆盖
+    expect(planUpdateStrategy(link, 'win32')).toBe('in-place');
   });
 });
 
@@ -213,5 +261,73 @@ describe('布局路径拼接', () => {
     expect(versionDir('1.2.3')).toBe(path.join(versionsRoot(), '1.2.3'));
     expect(versionBinary('1.2.3')).toBe(path.join(versionDir('1.2.3'), 'supsub'));
     expect(symlinkPath()).toBe(path.join(process.env.SUPSUB_BIN_DIR as string, 'supsub'));
+  });
+});
+
+describe('迁移落盘链路：装到 versions/ + symlink 覆盖普通文件（注入假下载器，不连网）', () => {
+  /** 假下载器：在临时目录造一个可辨识的假二进制，模拟 downloadBinary 的产物 */
+  function fakeDownloader(marker: string) {
+    return async (_v: string): Promise<{ binaryPath: string; tmpDir: string }> => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'supsub-fakedl-'));
+      const binaryPath = path.join(tmpDir, 'supsub');
+      fs.writeFileSync(binaryPath, `#!/bin/sh\necho ${marker}\n`, { mode: 0o755 });
+      return { binaryPath, tmpDir };
+    };
+  }
+
+  test('被困手装用户：bin 位普通文件 → 迁移后被 symlink 原子替换、指向 versions/', async () => {
+    // 造一个「被困手装用户」：bin 位是普通文件（非 symlink、不在 versions/ 下）
+    const link = symlinkPath();
+    fs.mkdirSync(path.dirname(link), { recursive: true });
+    fs.writeFileSync(link, '#!/bin/sh\necho OLD_MANUAL\n', { mode: 0o755 });
+    expect(fs.lstatSync(link).isSymbolicLink()).toBe(false); // 迁移前是普通文件
+    expect(planUpdateStrategy(link)).toBe('migrate-to-native');
+
+    // 走 update 的 goesNative 分支：装到 versions/ → 切 symlink
+    const dest = await installNativeVersion('0.5.0', fakeDownloader('NEW_050'));
+    expect(dest).toBe(versionBinary('0.5.0'));
+    expect(fs.existsSync(versionBinary('0.5.0'))).toBe(true);
+    switchToVersion('0.5.0');
+
+    // 迁移后：bin 位从普通文件变成 symlink，指向 versions/0.5.0/supsub
+    expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(readLinkedVersion()).toBe('0.5.0');
+    expect(fs.realpathSync(link)).toBe(fs.realpathSync(versionBinary('0.5.0')));
+    // 迁移后 detect 判为 native（穿透 symlink 落在 versions/ 下）
+    expect(detectInstallMethod(link)).toBe('native');
+    // symlink 指向的内容是新版本（不再是旧的普通文件内容）
+    expect(fs.readFileSync(fs.realpathSync(link), 'utf8')).toContain('NEW_050');
+  });
+
+  test('switchToVersion 对「普通文件占位」也能 rename 原子覆盖（非旧 symlink）', () => {
+    const link = symlinkPath();
+    fs.mkdirSync(path.dirname(link), { recursive: true });
+    fs.writeFileSync(link, 'plain', { mode: 0o755 });
+    fs.mkdirSync(versionDir('0.5.0'), { recursive: true });
+    fs.writeFileSync(versionBinary('0.5.0'), '#!/bin/sh\necho v050\n', { mode: 0o755 });
+    switchToVersion('0.5.0');
+    expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(readLinkedVersion()).toBe('0.5.0');
+  });
+
+  test('中途下载/落盘失败：不触碰 bin 位的普通文件（原样健在，未提前换 symlink）', async () => {
+    const link = symlinkPath();
+    fs.mkdirSync(path.dirname(link), { recursive: true });
+    fs.writeFileSync(link, 'ORIGINAL', { mode: 0o755 });
+
+    let threw = false;
+    try {
+      await installNativeVersion('0.5.0', async () => {
+        throw new Error('下载炸了');
+      });
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(true);
+    // 关键：换 symlink 尚未发生，普通文件必须原样健在
+    expect(fs.lstatSync(link).isSymbolicLink()).toBe(false);
+    expect(fs.readFileSync(link, 'utf8')).toBe('ORIGINAL');
+    // versions/0.5.0 也没建立（下载失败发生在拷贝之前）
+    expect(fs.existsSync(versionBinary('0.5.0'))).toBe(false);
   });
 });

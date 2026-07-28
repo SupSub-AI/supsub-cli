@@ -239,6 +239,12 @@ supsub update                       检查并更新到最新版本（并同步�
 > **npm 安装**：下载新 binary 原地替换。若全局目录无写权限（需 sudo 的路径），会提示改用
 > `npm i -g @supsub/cli@latest` 或加 `sudo` 重试。
 >
+> **manual（手装）安装**：`supsub doctor` 报 `manual` 的独立二进制（多为 0.4.0 之前
+> `curl … | bash` 装下的普通文件）。若它正好位于 native 的 symlink 位（默认 `~/.local/bin/supsub`），
+> 下次 `supsub update` 会**自动迁移到 native 布局**（下载到 `versions/` 后用 symlink 原子替换那个
+> 普通文件），一次收敛——此后即拥有版本并存、回滚与后台自动更新。手动 cp 到别处（如
+> `/usr/local/bin`）的独立二进制则维持原地覆盖，不迁移。
+>
 > 更新完成后会顺带把本地 Agent Skills 同步到新版本（best-effort，失败只警告不阻断）。
 > 详见下方 [Skills（AI agent 集成）](#skillsai-agent-集成)。
 
@@ -251,8 +257,8 @@ supsub update                       检查并更新到最新版本（并同步�
 ### 自检
 
 ```
-supsub doctor                       安装 / 更新自检：当前版本与真实路径、安装方式、symlink 指向、
-                                    留存版本、上次更新检查时间与结果、~/.local/bin 是否在 PATH、skills 同步状态
+supsub doctor                       安装 / 更新自检：当前版本与真实路径、安装方式（native / npm / manual / dev）、
+                                    symlink 指向、留存版本、上次更新检查时间与结果、~/.local/bin 是否在 PATH、skills 同步状态
 ```
 
 ### Skills 同步

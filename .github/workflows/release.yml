@@ -9,8 +9,34 @@ permissions:
   contents: write
 
 jobs:
+  # 前置门禁：编译出被测二进制后跑离线 native-install e2e harness（doctor 判定、rollback
+  # 两路、调度门限、manual 判定与拒绝迁移边界）。失败则后续多平台构建 / 发版一律不执行。
+  gate:
+    name: Offline native-install e2e gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build binary (被测 dist/supsub)
+        run: pnpm build
+
+      - name: Run offline native-install e2e harness
+        run: bash scripts/e2e-native-install.sh
+
   build:
     name: Build binaries
+    needs: gate
     runs-on: ubuntu-latest
     strategy:
       matrix:
