@@ -3,11 +3,13 @@ name: Deploy Docs
 on:
   push:
     branches: [master]
-    # 只有文档站相关文件变动才重新部署
+    # 只有文档站相关文件变动才重新部署。
+    # 刻意不列 package.json——chore(release) 每次只改它的 version 一行，
+    # 列进来会让每次发版都白跑一遍文档部署。依赖变更（如升级 vitepress）
+    # 由 pnpm-lock.yaml 兜住，它不记录本包自身的 version，不会被版本号误触发。
     paths:
       - 'docs/**'
       - '.github/workflows/docs.yml'
-      - 'package.json'
       - 'pnpm-lock.yaml'
   workflow_dispatch:
 
