@@ -15,6 +15,7 @@
 - 更新完成后，下次运行即是新版本。
 - **native 安装**：新版本下载到 `~/.local/share/supsub/versions/<版本>/` 并原子切换 symlink，旧版本保留最近 3 个可回滚，装在用户目录不需要 sudo。
 - **npm 安装**：原地替换 binary；若全局目录无写权限（如需 sudo 的路径），会以退出码 `1` 报错并提示改用 `npm i -g @supsub/cli@latest` 或加 `sudo` 重试。
+- **manual（手装）安装**：`doctor` 报 `manual` 的独立二进制（多为 0.4.0 之前 `curl … | bash` 装下的普通文件）。若它正好位于 native 的 symlink 位（默认 `~/.local/bin/supsub`），本次 `update` 会**自动迁移到 native 布局**：下载到 `versions/` 后用 symlink 原子替换那个普通文件，一次收敛，此后拥有版本并存、回滚与后台自动更新（下次启动生效）。手动 cp 到别处（如 `/usr/local/bin`）的独立二进制维持原地覆盖，不迁移；npm 包（`node_modules` 内）也一律不迁移。
 - 更新过程只访问 `registry.npmjs.org` 与 `github.com`，不读取 / 不发送任何凭证。
 
 ::: tip native 安装会后台静默自动更新
@@ -30,7 +31,9 @@ supsub doctor          # 人类可读表格
 supsub doctor -o json  # 供 agent / 脚本解析
 ```
 
-输出：当前版本与真实路径、安装方式（native / npm）、symlink 指向哪个版本、本地留存的版本列表、上次后台更新检查的时间与结果（含失败原因）、`~/.local/bin` 是否在 `PATH`、以及本地 skills 同步状态。静默自动更新出问题时，这里是第一查证入口。
+输出：当前版本与真实路径、安装方式（`native` / `npm` / `manual` / `dev`）、symlink 指向哪个版本、本地留存的版本列表、上次后台更新检查的时间与结果（含失败原因）、`~/.local/bin` 是否在 `PATH`、以及本地 skills 同步状态。静默自动更新出问题时，这里是第一查证入口。
+
+> **安装方式档位**：`native`（`~/.local` 版本并存 + symlink，自动更新）；`npm`（包管理器全局目录，手动更新）；`manual`（手装独立二进制——若在 native symlink 位，下次 `supsub update` 会自动迁到 native）；`dev`（`bun` 跑源码）。
 
 ## `skills` — Agent Skills 同步
 

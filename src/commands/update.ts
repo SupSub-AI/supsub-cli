@@ -7,6 +7,7 @@ import {
   detectInstallMethod,
   installNativeVersion,
   planRollback,
+  planUpdateStrategy,
   pruneVersions,
   switchToVersion,
 } from '../lib/install-layout.ts';
@@ -177,12 +178,20 @@ async function runUpdate(
     return;
   }
 
-  // 下载并安装二进制：
-  // - native 安装：装到 versions/<latest> 再原子切 symlink，保留最近 N 个版本供回滚；
-  // - npm / 其他：沿用原地暂存 + 原子 rename 覆盖（无版本并存）。
-  const method = detectInstallMethod();
+  // 下载并安装二进制。安装动作由 planUpdateStrategy 决定（纯函数，见 install-layout）：
+  // - native：装到 versions/<latest> 再原子切 symlink，保留最近 N 个版本供回滚；
+  // - migrate-to-native：被困手装用户（普通文件恰在 native symlink 位）——走同一条 native
+  //   路径，symlink 原子替换那个普通文件，一次性迁到版本并存布局；
+  // - in-place：npm / 手拷到别处的 manual——沿用原地暂存 + 原子 rename 覆盖（无版本并存）。
+  const method = detectInstallMethod(); // 迁移前的安装方式（JSON 里如实报告，manual 会显示 manual）
+  const strategy = planUpdateStrategy();
+  const goesNative = strategy === 'native' || strategy === 'migrate-to-native';
+  const migrated = strategy === 'migrate-to-native';
   await withSpinner(`下载并安装 v${latest}…`, async () => {
-    if (method === 'native') {
+    if (goesNative) {
+      // 下载 + 落盘（installNativeVersion）全部成功后，才用 switchToVersion 原子换 symlink。
+      // 迁移场景下 symlink 位当前是普通文件，rename 会原子地用 symlink 覆盖它；中途任一步
+      // 失败都发生在换 symlink 之前，那个普通文件原样健在（不会出现半残）。
       await installNativeVersion(latest);
       switchToVersion(latest);
       pruneVersions(KEEP_VERSIONS);
@@ -196,10 +205,19 @@ async function runUpdate(
     ? ({ action: 'in_sync' } as SkillsOutcome)
     : await runSkillsSync(latest, opts.force ?? false);
 
-  output({ current, latest, hasUpdate, updated: true, method, skills }, fmt, () => {
-    const from = current === latest ? `v${latest}（重新安装）` : `v${current} → v${latest}`;
-    const suffix = method === 'native' ? '（下次启动生效）' : '';
-    process.stdout.write(`✅ 已更新 ${from}${suffix}\n`);
-    printSkillsHint(skills);
-  });
+  output(
+    { current, latest, hasUpdate, updated: true, method, strategy, migrated, skills },
+    fmt,
+    () => {
+      const from = current === latest ? `v${latest}（重新安装）` : `v${current} → v${latest}`;
+      const suffix = goesNative ? '（下次启动生效）' : '';
+      process.stdout.write(`✅ 已更新 ${from}${suffix}\n`);
+      if (migrated) {
+        process.stdout.write(
+          '📦 已迁移到 native 布局（版本并存 + 可回滚），后台自动更新自此生效（下次启动）\n',
+        );
+      }
+      printSkillsHint(skills);
+    },
+  );
 }

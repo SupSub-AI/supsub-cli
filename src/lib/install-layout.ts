@@ -89,14 +89,23 @@ function realpathBestEffort(p: string): string {
   }
 }
 
-/** 安装方式：native（~/.local 版本并存）/ npm（包管理器全局目录）/ dev（bun 跑源码） */
-export type InstallMethod = 'native' | 'npm' | 'dev';
+/**
+ * 安装方式：
+ * - native：~/.local 版本并存 + symlink（唯一自动更新的安装方式）
+ * - npm：包管理器全局目录（真实路径含 node_modules）
+ * - dev：bun / node 本体跑源码
+ * - manual：其余独立二进制（0.4.0 之前 curl 装的普通文件、或手动 cp 到某处的 binary）
+ */
+export type InstallMethod = 'native' | 'npm' | 'dev' | 'manual';
 
 /**
- * 判定当前运行的二进制是哪种安装方式。
- * - native：真实路径落在 versions/ 下（唯一自动更新的安装方式）。
- * - dev：真实可执行文件是 bun / node 本体（`bun run src/index.ts` 源码直跑）。
- * - npm：其余情况（装在包管理器全局 bin、或手动放置的独立二进制）。
+ * 判定当前运行的二进制是哪种安装方式。判定顺序（互斥、从最确定到兜底）：
+ * 1. native：真实路径落在 versions/ 下（唯一自动更新的安装方式）。
+ * 2. dev：真实可执行文件是 bun / node 本体（`bun run src/index.ts` 源码直跑）。
+ * 3. npm：真实路径里含 `node_modules`（装在包管理器全局 bin，包由 npm/pnpm 管理）。
+ * 4. manual：其余独立二进制——0.4.0 之前 `curl … | bash` 装的普通文件（未走版本并存），
+ *    或用户自己 cp 到 /usr/local/bin 之类位置的 binary。这批人原地覆盖后永远判不成
+ *    native、拿不到后台自动更新 / 回滚，故单列一档，供 update 迁移分支识别并收敛。
  */
 export function detectInstallMethod(realBin: string = resolveRealBinary()): InstallMethod {
   // 两边都过一遍 realpath，避免「一边解析了 symlink 祖先、一边没解析」导致漏判。
@@ -105,7 +114,45 @@ export function detectInstallMethod(realBin: string = resolveRealBinary()): Inst
   if (real === root || real.startsWith(root + path.sep)) return 'native';
   const base = path.basename(real).toLowerCase();
   if (base === 'bun' || base === 'bun.exe' || base === 'node' || base === 'node.exe') return 'dev';
-  return 'npm';
+  // 包管理器全局安装：真实路径穿过 node_modules（如 …/node_modules/@supsub/cli/bin/supsub）。
+  // 用路径段精确匹配，避免把恰好名字里含 "node_modules" 的普通目录误判。
+  const segments = real.split(path.sep);
+  if (segments.includes('node_modules')) return 'npm';
+  return 'manual';
+}
+
+/**
+ * `supsub update` 的安装动作策略。抽成纯函数（仿 planRollback）便于单测，把「原地覆盖
+ * vs 迁移到 native 布局」这个决策与命令层的下载/输出剥离开。三种互斥结果：
+ * - `native`：已是 native 布局，装到 versions/ 再原子切 symlink（保留最近 N 个可回滚）。
+ * - `migrate-to-native`：**被困手装用户**——0.4.0 之前 curl 装的普通文件恰好落在 native 的
+ *   symlink 位（默认 ~/.local/bin/supsub）。这批人原地覆盖后产物仍是普通文件，永远判不成
+ *   native、拿不到后台自动更新 / 回滚。改走 native 安装路径：下载到 versions/ 后用 symlink
+ *   原子替换那个普通文件，一次收敛，此后与 native 无异。
+ * - `in-place`：其余 non-native（npm、或手动 cp 到别处的 manual）——沿用原地暂存 + 原子
+ *   rename 覆盖。npm 由包管理器管理（迁移会造成 PATH 遮蔽与包残留），手拷到别处的 manual
+ *   不在 native bin 位、迁了 symlink 也不在 PATH 上，一律维持原地覆盖。
+ */
+export type UpdateStrategy = 'native' | 'migrate-to-native' | 'in-place';
+
+export function planUpdateStrategy(
+  realBin: string = resolveRealBinary(),
+  platform: NodeJS.Platform = process.platform,
+): UpdateStrategy {
+  const method = detectInstallMethod(realBin);
+  if (method === 'native') return 'native';
+  // 仅迁移「被困在 native symlink 位的普通文件手装用户」：
+  //   ① 是 manual（独立二进制，非 npm 包 / 非 dev）；
+  //   ② 真实路径正好是 native 的 symlink 位（realpath 两端比较，兼容 symlink 祖先）；
+  //   ③ 非 Windows（native 布局当前只支持 macOS / Linux，Windows 走 npm）。
+  if (
+    method === 'manual' &&
+    platform !== 'win32' &&
+    realpathBestEffort(realBin) === realpathBestEffort(symlinkPath())
+  ) {
+    return 'migrate-to-native';
+  }
+  return 'in-place';
 }
 
 /**
@@ -185,9 +232,16 @@ export function switchToVersion(version: string): void {
  * 下载并把某版本二进制安装到 versions/<version>/supsub（不切换 symlink）。
  * 复用 self-update.downloadBinary 的下载/解压逻辑，只是落点改为版本并存目录。
  * 返回安装好的可执行文件路径。
+ *
+ * `download` 参数是**测试注入缝**（默认真实 downloadBinary）：迁移 / native 安装的下载
+ * 原语抽在 self-update.ts，单测注入一个不连网的假下载器即可验证「装到 versions/ + 切
+ * symlink 覆盖普通文件」的整条落盘链路。生产调用方一律只传 version、走默认下载。
  */
-export async function installNativeVersion(version: string): Promise<string> {
-  const { binaryPath, tmpDir } = await downloadBinary(version);
+export async function installNativeVersion(
+  version: string,
+  download: (v: string) => Promise<{ binaryPath: string; tmpDir: string }> = downloadBinary,
+): Promise<string> {
+  const { binaryPath, tmpDir } = await download(version);
   try {
     const dir = versionDir(version);
     fs.mkdirSync(dir, { recursive: true });

@@ -26,7 +26,15 @@
 ```
 
 - `SUPSUB_DATA_DIR` / `SUPSUB_BIN_DIR` 可覆盖两个目录（测试隔离 + 高级自定义）。
-- **安装方式判定**：`resolveRealBinary()`（realpath 穿透 symlink）落在 `versions/` 下即 native；bun/node 本体为 dev；其余为 npm。判定两端都过一遍 realpath，避免 `/tmp → /private/tmp` 这类 symlink 祖先导致漏判。
+- **安装方式判定**（`detectInstallMethod`，互斥四档，从最确定到兜底）：`resolveRealBinary()`（realpath 穿透 symlink）落在 `versions/` 下即 **native**；bun/node 本体为 **dev**；真实路径含 `node_modules` 段为 **npm**（包管理器全局安装）；其余独立二进制为 **manual**（0.4.0 之前 `curl … | bash` 装的普通文件、或手动 cp 到某处的 binary）。判定两端都过一遍 realpath，避免 `/tmp → /private/tmp` 这类 symlink 祖先导致漏判。
+
+### 被困手装用户的一次性迁移（manual → native）
+
+0.4.0 之前 `curl … | bash` 装的是 `~/.local/bin/supsub` **普通文件**（未走版本并存）。这批人跑 `supsub update` 原地覆盖后产物仍是普通文件 → 永远判不成 native → 永远没有后台自动更新和回滚，`doctor` 也误标。为一次收敛，`update` 引入迁移分支（决策抽成纯函数 `planUpdateStrategy`，仿 `planRollback`）：
+
+- `native` → 装到 `versions/` 再原子切 symlink（保留最近 N 个可回滚）。
+- `migrate-to-native` → **被困手装用户**：`manual` 且真实路径正好是 native 的 symlink 位（realpath 两端比较）且非 Windows。走与 native 相同的安装路径——下载到 `versions/` 后 `switchToVersion` 用 symlink **原子替换那个普通文件**（`rename` 覆盖普通文件语义正确）。下载 / 落盘全部成功后才换 symlink，中途失败普通文件原样健在。迁移后 `detectInstallMethod` 即判 native，后台自动更新自此生效（下次启动）。
+- `in-place` → 其余 non-native（npm 包、或手拷到别处的 manual）沿用原地暂存 + 原子 `rename` 覆盖。npm 由包管理器管理（迁移会造成 PATH 遮蔽与包残留），手拷到别处的 manual 不在 native bin 位、迁了 symlink 也不在 PATH 上，均不迁移。
 
 ### 后台更新（绝不阻塞当前命令）
 
