@@ -36,6 +36,10 @@
 - `migrate-to-native` → **被困手装用户**：`manual` 且真实路径正好是 native 的 symlink 位（realpath 两端比较）且非 Windows。走与 native 相同的安装路径——下载到 `versions/` 后 `switchToVersion` 用 symlink **原子替换那个普通文件**（`rename` 覆盖普通文件语义正确）。下载 / 落盘全部成功后才换 symlink，中途失败普通文件原样健在。迁移后 `detectInstallMethod` 即判 native，后台自动更新自此生效（下次启动）。
 - `in-place` → 其余 non-native（npm 包、或手拷到别处的 manual）沿用原地暂存 + 原子 `rename` 覆盖。npm 由包管理器管理（迁移会造成 PATH 遮蔽与包残留），手拷到别处的 manual 不在 native bin 位、迁了 symlink 也不在 PATH 上，均不迁移。
 
+**0.4.3 单命令收敛**：迁移是否发生**不再依赖「本次有没有新版本」**。是否要动二进制由纯函数 `decideUpdateAction({hasUpdate, force, strategy})` 决定——三种情形触发安装：有新版本 / `--force` / **`strategy === 'migrate-to-native'`**。于是被困手装用户即便**已是最新版本、未加 `--force`**，裸 `supsub update` 也会下载当前 `latest` 落盘并换 symlink 完成迁移（「跑一次 update 必上 native 轨道」）；而 native / npm / dev 在已是最新且非 `--force` 时 `doBinaryWork=false`，仍走早退、绝不产生下载。输出语义诚实：`updated`（版本是否变化）与 `migrated`（布局是否变化）两个字段独立——已是最新时迁移即 `updated=false, migrated=true`，文案「已是最新（vX.Y.Z），已迁移到 native 布局」。
+
+> 演进注记：0.4.2 首版迁移分支挂在「有新版本 / `--force`」的安装路径上，已是最新时裸 `update` 会先早退、错过迁移（需 `supsub update --force` 或重跑 install.sh 两步）。0.4.3 把 strategy 判断前移到早退之前，收敛为单命令。
+
 ### 后台更新（绝不阻塞当前命令）
 
 ```mermaid
@@ -134,24 +138,24 @@ flowchart TD
     Start([supsub update]):::start --> Check["checkForUpdate()<br/>GET registry.npmjs.org/@supsub/cli/latest"]:::step
     Check -->|网络失败| ErrNet["抛 NETWORK_ERROR<br/>exit 10"]:::err
     Check -->|非 2xx| ErrSrv["抛 SERVER_ERROR<br/>exit 11"]:::err
-    Check --> Cmp{"compareSemver(latest, current)"}:::dec
+    Check --> Chk{"--check？"}:::dec
 
-    Cmp -->|"--check"| Report["只报告 current/latest/hasUpdate<br/>不下载、不动 skills"]:::out
+    Chk -->|是| Report["只报告 current/latest/hasUpdate<br/>不下载、不迁移、不动 skills（updated=false, migrated=false）"]:::out
     Report --> End1([结束 exit 0]):::start
 
-    Cmp -->|"已最新 且 非 --force"| Skills1["顺带校正本地 skills<br/>runSkillsSync(current)"]:::skill
-    Skills1 --> MsgUp2date["✅ 已是最新版本"]:::out --> End2([结束 exit 0]):::start
+    Chk -->|否| Plan["method=detectInstallMethod()<br/>strategy=planUpdateStrategy()"]:::step
+    Plan --> Dec{"decideUpdateAction<br/>hasUpdate 或 --force 或<br/>strategy==migrate-to-native ？"}:::dec
 
-    Cmp -->|"有新版 或 --force"| Perform["performUpdate(latest)"]:::step
-    Perform --> Detect["detectPlatform()<br/>os/arch → Release 资产名"]:::step
-    Detect -->|不支持平台| ErrPlat["抛 UPDATE_FAILED"]:::err
-    Detect --> DL["下载 supsub-cli_X_OS_ARCH.tar.gz/.zip"]:::step
-    DL -->|失败| ErrDL["NETWORK/SERVER_ERROR"]:::err
-    DL --> Extract["解压（tar / PowerShell Expand-Archive）"]:::step
-    Extract --> Atomic["同目录暂存 .supsub-update-PID<br/>chmod 0755 → 原子 rename 覆盖运行中的二进制"]:::step
-    Atomic -->|EACCES/EPERM| ErrPerm["UPDATE_PERMISSION_DENIED<br/>提示改用 npm i -g 或 sudo"]:::err
-    Atomic --> Skills2["二进制已换 → 同步 skills 到 latest<br/>runSkillsSync(latest)（best-effort）"]:::skill
-    Skills2 --> MsgDone["✅ 已更新 vCur → vLatest<br/>（附 skills 同步结果）"]:::out --> End3([结束 exit 0]):::start
+    Dec -->|"doBinaryWork=false<br/>（已最新·非 force·非 migrate）"| Skills1["顺带校正本地 skills<br/>runSkillsSync(current)"]:::skill
+    Skills1 --> MsgUp2date["✅ 已是最新版本<br/>updated=false, migrated=false"]:::out --> End2([结束 exit 0]):::start
+
+    Dec -->|"doBinaryWork=true"| Native{"goesNative？<br/>（native / migrate-to-native）"}:::dec
+    Native -->|是| InstN["installNativeVersion(latest) 装到 versions/<br/>→ switchToVersion 原子切 symlink<br/>（迁移时 symlink 原子替换普通文件）→ pruneVersions"]:::step
+    Native -->|"否（in-place：npm / 别处 manual）"| InstP["performUpdate(latest)<br/>同目录暂存 + 原子 rename 覆盖"]:::step
+    InstP -->|EACCES/EPERM| ErrPerm["UPDATE_PERMISSION_DENIED<br/>提示改用 npm i -g 或 sudo"]:::err
+    InstN --> Skills2["同步 skills 到 latest<br/>runSkillsSync(latest)（best-effort）"]:::skill
+    InstP --> Skills2
+    Skills2 --> MsgDone["✅ 已更新 / 已迁移<br/>updated=版本是否变化 · migrated=布局是否变化"]:::out --> End3([结束 exit 0]):::start
 
     classDef start fill:#e2e8f0,stroke:#475569,color:#111;
     classDef step fill:#bfdbfe,stroke:#1d4ed8,color:#111;
@@ -164,6 +168,8 @@ flowchart TD
 ### 1.2 关键点
 
 - **版本来源**：npm registry 的 `latest` dist-tag（`checkForUpdate`）；`compareSemver` 只比较 `major.minor.patch`，忽略 `v` 前缀与 prerelease 尾巴。
+- **动作决策（0.4.3 收敛）**：纯函数 `decideUpdateAction({hasUpdate, force, strategy})` 决定「是否动二进制 / 是否走 native 路径 / 是否构成迁移」。**strategy 判断前移到「已是最新早退」之前**——被困手装用户（`migrate-to-native`）即使已是最新也迁移；native/npm/dev 在已是最新且非 `--force` 时不动二进制。输出 `updated`（版本变化）与 `migrated`（布局变化）两字段独立。
+- **安装动作分派**：`goesNative`（native / migrate-to-native）走 `installNativeVersion → switchToVersion → pruneVersions`（装到 `versions/` 再原子切 symlink）；`in-place`（npm / 别处 manual）走 `performUpdate`（原地暂存 + 原子 rename 覆盖）。
 - **资产命名**：`supsub-cli_<version>_<os>_<arch>.<ext>`，与 `scripts/postinstall.cjs` 同一套规则（`buildDownloadUrl` + `detectPlatform`）。
 - **原地替换**：先在**二进制同目录**暂存（避免跨文件系统 `EXDEV`），`chmod 0755` 后用 `rename` 原子覆盖——`rename` 可以替换正在运行的可执行文件。
 - **独立 fetch**：目标是 `registry.npmjs.org` / `github.com`，不走 `http/client.ts` 的鉴权与 401→clearAuth（与 `api/auth.ts` 的 device 端点同理）。

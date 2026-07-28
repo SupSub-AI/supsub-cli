@@ -15,6 +15,11 @@
 # 注意本 harness **不覆盖真实版本升级 / 后台真下载 / install.sh 联网安装**——那些需要
 # 网络与「低版本起点」的构造，请见 PR 描述里的手工实测记录。这里只跑离线可确定复现的部分。
 #
+# 0.4.3「单命令收敛」（已是最新时，被困手装用户裸 `supsub update` 也迁移到 native）同样
+# **无法在此离线断言**：它要求 checkForUpdate 查 npm registry + 下载当前 latest 才能换 symlink，
+# 是联网路径。决策与控制流由单测覆盖（decideUpdateAction 行为矩阵 + runUpdate 注入依赖 +
+# 假下载器真迁移，见 test/commands/update.test.ts），联网验证由发版前手工实测。
+#
 # 为什么不走 bun test：这些场景要跑**编译后的整二进制**（含 detached 子进程 / commander
 # 派发 / 退出码），与进程内单测互补；放 scripts/ 作为 opt-in 冒烟，语义更贴近真实使用。
 
