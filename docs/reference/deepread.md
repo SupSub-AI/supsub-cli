@@ -1,17 +1,17 @@
 # `deepread` 精读
 
-对**单篇**文章做 AI 深度拆解，产出「一句话本质 / 干货成色 / 核心要点 / 分节正文 / 编辑批注（背景 · 立场 · 来源可信度 · 最弱一环）」。
+对**单篇**文章做 AI 深度拆解，产出结构化的精读结果。
 
 ::: warning 按次消耗月度额度
-实测 `limit=100`，**没有退额度操作**。已精读过的文章重复发起不会重复扣费。
+**没有退额度操作**，余额用 `deepread quota` 查询。已精读过的文章重复发起不会重复扣费。
 :::
 
 精读 ≠ 摘要（`sub contents` 的 `summary` 已经是摘要），也 ≠ 全文（CLI 没有取原文的接口）。
 
 | 命令 | 功能 |
 |---|---|
-| `supsub deepread run` | 发起精读。先探测状态，`none` / `failed` 才真正发起；默认前台轮询到完成 |
-| `supsub deepread get` | 查看结果。`done` 是终态、结果不可变，默认直接用本地缓存（零请求） |
+| `supsub deepread run` | 发起精读，默认前台等待到完成；已精读过的文章重复发起不会重复扣费 |
+| `supsub deepread get` | 查看结果，默认优先本地缓存 |
 | `supsub deepread list` | 本地精读队列（收件箱语义） |
 | `supsub deepread quota` | 本月额度 `{limit, used, remaining}` |
 | `supsub deepread share` | 生成分享链接 `<web>/s/<code>` |
@@ -31,9 +31,9 @@
 | `--url <url>` | 原文链接，写入本地队列 | 无 |
 | `--no-wait` | 只发起不等待，立刻返回 | 前台等待 |
 | `--timeout <sec>` | 等待上限秒数，1–600 | `180` |
-| `--brief` | 精简输出：省略正文 sections | 全量 |
+| `--brief` | 精简输出：省略正文部分 | 全量 |
 
-实测精读耗时约 20~40 秒，所以默认前台等待（3 秒轮询）。
+精读通常需要几十秒完成，所以默认前台等待。
 
 ```shell
 supsub deepread run --type MP --content-id <cid> --title "标题"
@@ -52,21 +52,21 @@ supsub deepread run --type MP --content-id <cid> --no-wait   # 批量发起，�
 | `--refresh` | 忽略本地缓存，强制回服务端查 | 用缓存 |
 | `--wait` | `pending` 时等到落定 | 不等 |
 | `--timeout <sec>` | 等待上限秒数 | `180` |
-| `--brief` | 省略正文 sections | 全量 |
+| `--brief` | 省略正文部分 | 全量 |
 | `--out <file>` | 把精读全文导出为 Markdown 文件 | 不导出 |
 | `--title` / `--source-name` / `--url` | 补写进本地缓存 | 无 |
 
-`done` 是终态且结果不可变，所以命中本地缓存时零请求。
+已完成的精读结果不会再变化，默认直接使用本地缓存；需要重新向服务端确认时加 `--refresh`。
 
 ## `supsub deepread list` — 本地队列
 
 | 选项 | 说明 |
 |---|---|
-| `--all` | 显示全部历史记录（且**不写**播报水位线） |
+| `--all` | 显示全部历史记录 |
 | `--wait` | 等到队列里所有进行中的精读都落定 |
 | `--timeout <sec>` | 等待上限秒数（默认 `180`，上限 600） |
 
-默认只显示「进行中」+「完成但尚未播报过」的条目，播报后打水位线——收件箱语义，适合 `--no-wait` 批量发起后回来收割。
+默认只显示「进行中」+「完成但尚未看过」的条目——收件箱语义，适合 `--no-wait` 批量发起后回来收割；`--all` 则不影响后续默认视图。
 
 ## `supsub deepread quota` — 额度
 
@@ -89,11 +89,4 @@ supsub deepread show --share-code <code>             # 看别人分享的，无�
 
 ## 本地缓存 / 队列
 
-后端没有「列出我所有精读」的接口，裸发起的精读也**不会**进网页端的「稍后阅读」列表，所以 CLI 自建本地索引：
-
-```
-~/.supsub/deepread/<账号>/<TYPE>_<hash>.json   完整记录（元数据 + 精读结果）
-~/.supsub/deepread/<账号>/<TYPE>_<hash>.md     渲染好的 Markdown 全文
-```
-
-一条一个文件（并发发起不会互相覆盖），按账号分目录。**队列是本机本地的**，与网页端、其它设备互不可见。
+每篇精读会在 `~/.supsub/deepread/` 下保存一份本地副本（含可直接阅读的 Markdown），按账号分目录。**队列是本机本地的**，与网页端的「稍后阅读」、其它设备互不可见。

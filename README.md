@@ -162,7 +162,7 @@ supsub group remove-sub             把订阅源移出分组（幂等，不会�
   --id <gid> --source-id <sid> --type <MP|WEBSITE|X>   均必填
 ```
 
-> 分组成员编辑走后端的「全量覆盖」端点，CLI 内部做读-改-写，请勿并发编辑同一分组。
+> 分组成员编辑是整体覆盖语义，请勿并发编辑同一分组（包括同时在网页端编辑同一分组）。
 
 ### 未读概览
 
@@ -181,13 +181,13 @@ supsub search <keyword>             全量搜索（订阅源 + 文章）
 ### 精读
 
 ```
-supsub deepread run                 对单篇文章做 AI 深度拆解（默认前台等待，实测 20~40s）
+supsub deepread run                 对单篇文章做 AI 深度拆解（默认前台等待完成，通常需要几十秒）
   --type <MP|WEBSITE|X>             信息源类型
   --content-id <cid>                内容 ID（来自 sub contents / focus contents / search）
   --title / --source-name / --url   写入本地队列的展示信息（建议总是带上）
   --no-wait                         只发起不等待（批量排队时用）
   --timeout <sec>                   等待上限，默认 180
-  --brief                           省略正文 sections，只留本质/成色/要点/批注
+  --brief                           精简输出，省略正文部分
 supsub deepread get                 查看精读结果（优先本地缓存，--refresh 强制回源，--out 导出 Markdown）
 supsub deepread list                本地精读队列（--wait 等全部落定，--all 看全部历史）
 supsub deepread quota               本月精读额度余额
@@ -196,17 +196,16 @@ supsub deepread show --share-code   查看他人分享的精读（无需登录�
 supsub deepread drop                从本地队列移除（不影响服务端结果）
 ```
 
-> **精读按次消耗月度额度**（实测 100 次/月），且没有退额度的操作 —— agent 集成务必在发起前
-> 先 `deepread quota` 并与用户确认。已精读过的文章重复 `run` 不会重复扣费（命中缓存直接返回）。
+> **精读按次消耗月度额度**，且没有退额度的操作 —— agent 集成务必在发起前
+> 先 `deepread quota` 查询余额并与用户确认。已精读过的文章重复 `run` 不会重复扣费。
 >
-> 结果结构：一句话本质 / 干货成色 / 核心要点 / 分节正文 / 编辑批注（背景·立场·来源可信度·最弱一环）。
-> 每篇会在 `~/.supsub/deepread/<账号>/` 落一份 `.json`（完整记录）+ `.md`（渲染好的全文）；
+> 每篇精读会在 `~/.supsub/deepread/` 下保存本地副本（含可直接阅读的 Markdown）；
 > 队列是**本机本地**的，与网页端的「稍后阅读」互不可见。
 
 ### 公众号
 
 ```
-supsub mp search <name>             搜索公众号（异步，自动轮询 30s）
+supsub mp search <name>             搜索公众号（异步，自动等待最长约 30s）
 supsub mp search-cancel <searchId>  取消正在执行的搜索任务
 ```
 
@@ -219,12 +218,11 @@ supsub update                       检查并更新到最新版本（下载新 b
   --skip-skills                     本次更新不同步本地 skills
 ```
 
-> 自更新从 npm registry 查最新版本，再从 GitHub Release 下载对应平台的预编译 binary、
-> 原地替换正在运行的可执行文件。若全局安装目录无写权限（如装在需 sudo 的路径），
+> 自更新会检查并安装最新版本。若全局安装目录无写权限（如装在需 sudo 的路径），
 > 会提示改用 `npm i -g @supsub/cli@latest` 或加 `sudo` 重试。
 >
-> 二进制替换完成后会顺带把本地 Agent Skills 同步到新版本（best-effort，失败只警告不阻断）。
-> 详见下方 [Skills（AI agent 集成）](#skillsai-agent-集成) 与 [`docs/self-update-flow.md`](./docs/self-update-flow.md)。
+> 更新完成后会顺带把本地 Agent Skills 同步到新版本（best-effort，失败只警告不阻断）。
+> 详见下方 [Skills（AI agent 集成）](#skillsai-agent-集成)。
 
 ### Skills 同步
 
@@ -236,9 +234,8 @@ supsub skills status                查看本地 skills 版本 vs 当前 CLI 版
 supsub skills list                  列出本仓库提供的 skills
 ```
 
-> CLI 自更新只换二进制，本地 skills 不会自动跟着升级。supsub 在 `~/.supsub/skills-state.json`
-> 记录「上次同步到的 CLI 版本」，每次运行命令做一次零网络的本地比对——一旦本地 skills 落后于
-> 当前二进制，就在 stderr 提示运行 `supsub skills sync`。设 `SUPSUB_NO_SKILLS_NOTIFIER=1` 可关闭该提示。
+> CLI 自更新只换二进制，本地 skills 不会自动跟着升级。一旦检测到本地 skills 落后于
+> 当前版本，就在 stderr 提示运行 `supsub skills sync`。设 `SUPSUB_NO_SKILLS_NOTIFIER=1` 可关闭该提示。
 
 ---
 
@@ -299,8 +296,7 @@ npx -y skills add SupSub-AI/supsub-cli --skill '*' -y
 ```
 
 > 升级后想让本地 skills 跟上：`supsub update` 会自动同步，或随时手动 `supsub skills sync`；
-> `supsub skills status` 可查看本地 skills 是否与当前 CLI 版本一致。完整流程见
-> [`docs/self-update-flow.md`](./docs/self-update-flow.md)。
+> `supsub skills status` 可查看本地 skills 是否与当前 CLI 版本一致。
 
 ### 使用
 

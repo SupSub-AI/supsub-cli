@@ -30,7 +30,7 @@ supsub -o json sub list | jq '.data[] | select(.unreadCount > 0)'
 
 ## Loading 动画
 
-发请求 / 轮询等耗时操作期间会在 stderr 显示一个 spinner（如「加载订阅列表…」「搜索公众号「X」中…」「等待浏览器授权中…」），避免黑屏。
+网络请求等耗时操作期间会在 stderr 显示一个 spinner（如「加载订阅列表…」「搜索公众号「X」中…」「等待浏览器授权中…」），避免黑屏。
 
 - 仅在**交互式终端（TTY）**下渲染。
 - 管道 / 重定向 / CI / 非 TTY 环境自动静默，绝不污染 stdout。

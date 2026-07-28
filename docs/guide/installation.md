@@ -44,7 +44,7 @@ npx -y skills add SupSub-AI/supsub-cli --skill '*' -y
 supsub auth login
 ```
 
-- 默认走浏览器 **OAuth 设备授权**：终端打印授权链接与授权码，并自动打开浏览器；用户在浏览器确认后，CLI 轮询拿到令牌即登录成功。
+- 默认走浏览器 **OAuth 设备授权**：终端打印授权链接与授权码，并自动打开浏览器；用户在浏览器确认后，CLI 即自动完成登录。
 - 授权成功后凭证写入 `~/.supsub/config.json`，终端展示当前用户「昵称 \<邮箱\>」。
 
 **Agent / 无头环境**：设 `SUPSUB_NO_BROWSER=1` 跳过自动打开浏览器，再从终端输出里提取授权链接（形如 `请在浏览器打开 https://…`）交用户在浏览器完成授权：
@@ -53,7 +53,7 @@ supsub auth login
 SUPSUB_NO_BROWSER=1 supsub auth login
 ```
 
-凭证优先级与令牌续期见[登录与凭证](./auth)。
+令牌续期与失效说明见[登录与凭证](./auth)。
 
 ## 第 4 步　验证
 

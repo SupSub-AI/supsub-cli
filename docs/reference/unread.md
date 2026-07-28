@@ -6,7 +6,7 @@
 |---|---|
 | `--all` | 显示全部（含 `unreadCount = 0` 的项）；默认只显示有未读的 |
 
-并发聚合「订阅源列表 + 关注点列表」，等价于 `sub list` + `focus list` 两查。输出分两段：
+一次给出「订阅源 + 关注点」两类未读概览。输出分两段：
 
 - **订阅源**：`sourceId`、`类型`、`name`、`unreadCount`
 - **关注点**：`id`、`icon`、`title`、`unreadCount`

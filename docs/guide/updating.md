@@ -4,7 +4,7 @@ SupSub 的「CLI 本体」与「Agent Skills」是两份**独立分发、却一�
 
 | 产物 | 分发方式 | 安装位置 | 谁来更新 |
 |---|---|---|---|
-| CLI 二进制 | npm `@supsub/cli` → postinstall 从 GitHub Release 下载 | npm 全局 bin（`supsub`） | `supsub update` / `npm i -g` |
+| CLI 二进制 | npm `@supsub/cli` | npm 全局 bin（`supsub`） | `supsub update` / `npm i -g` |
 | Agent Skills | `npx skills add` 拉取仓库 / Claude Code 插件市场 | `./.agents/skills`（项目）或 `~/.claude/skills`（全局） | `supsub skills sync` |
 
 核心矛盾是：**`supsub update` 只换掉二进制，本地 skills 仍停留在旧版**，于是出现「二进制 v0.4.0、本地 skills v0.3.2」的漂移。下面两节分别解决。
@@ -18,12 +18,10 @@ supsub update --force    # 即使已是最新也重新下载安装（修复损�
 supsub update --skip-skills   # 本次更新不同步本地 skills
 ```
 
-机制说明：
+说明：
 
-- 从 **npm registry** 查最新版本号，再从 **GitHub Release** 下载对应平台的预编译 binary。
-- 替换采用「同目录暂存 + 原子 `rename`」覆盖自身，Unix 下可覆盖正在运行的可执行文件，更新后下次运行即新版本。
-- 下载资产命名与 `scripts/postinstall.cjs` 完全一致（同一套 GitHub Release 包），二者是两条等价的更新路径。
-- **不读取、不发送任何凭证**，只访问 `registry.npmjs.org` 与 `github.com`，与 SupSub API 鉴权无关。
+- 更新完成后，下次运行即是新版本。
+- 更新过程只访问 `registry.npmjs.org` 与 `github.com`，**不读取、不发送任何凭证**。
 - 若全局安装目录无写权限（如装在需 sudo 的路径），会以退出码 `1` 报错并提示改用 `npm i -g @supsub/cli@latest` 或加 `sudo` 重试。
 
 ::: tip 不会后台自动更新
@@ -44,13 +42,12 @@ supsub skills list            # 列出仓库提供的 skills
 `skills sync` **默认只装到当前项目**（`./.agents/skills`）。全局安装对所有项目可见、侵入性强，需要显式加 `--global`。
 :::
 
-## 漂移检测是怎么工作的
+## 漂移提示
 
-`~/.supsub/skills-state.json` 记录「上次把 skills 同步到的 CLI 版本」。每次运行任意命令前，CLI 做一次**零网络的本地比对**：
+CLI 检测到本地 skills 版本落后于当前二进制时，会在 **stderr** 提示运行 `supsub skills sync`：
 
-- 本地 skills 版本落后于当前二进制 → 在 **stderr** 提示运行 `supsub skills sync`。
 - `skills` / `update` / `--help` 等命令不重复打扰。
-- 冷启动（从未通过 supsub 同步过）、CI 环境、以及 `SUPSUB_NO_SKILLS_NOTIFIER` 为真值时不提示。
+- 从未通过 supsub 同步过、CI 环境、以及 `SUPSUB_NO_SKILLS_NOTIFIER` 为真值时不提示。
 
 因为提示走 stderr，`-o json` 的 stdout 数据始终纯净，不会污染 `jq` 管道。
 
@@ -59,7 +56,3 @@ supsub skills list            # 列出仓库提供的 skills
 ```shell
 export SUPSUB_NO_SKILLS_NOTIFIER=1
 ```
-
-::: tip 完整流程图
-二进制自更新与 skills 同步的完整流程图，见仓库内的设计文档 [`docs/self-update-flow.md`](https://github.com/SupSub-AI/supsub-cli/blob/master/docs/self-update-flow.md)。
-:::

@@ -15,13 +15,13 @@
 ## `group subs` 的两种模式
 
 - **默认**（仅组内成员）：输出列 `sourceId`、`类型`、`name`、`unreadCount`、`description`。
-- **`--all`**（全部订阅源）：输出列 `sourceId`、`类型`、`name`、`inGroup`、`description`——后端在这个模式下**不返回** `unreadCount`，要未读数就用默认模式。
+- **`--all`**（全部订阅源）：输出列 `sourceId`、`类型`、`name`、`inGroup`、`description`——这个模式下**没有** `unreadCount`，要未读数就用默认模式。
 - `--type` 可过滤类型，取值比订阅命令更宽：`MP|WEBSITE|X|PODCAST|NEWSLETTER`（分组里可能有网页端加入的播客 / 通讯源）。
 
-## 成员编辑是全量覆盖
+## 不要并发编辑同一分组
 
-::: danger 不要并发编辑同一分组
-后端没有单个成员的原子增删端点，`add-sub` / `remove-sub` 由 CLI 先拉取当前成员列表、改完再整份写回。因此**不要并发执行**，也不要在网页端同时编辑同一分组，否则后写入的一方会覆盖另一方的改动。
+::: danger 后写入会覆盖先写入
+`add-sub` / `remove-sub` 对分组成员是整体覆盖语义。**不要并发执行**，也不要在网页端同时编辑同一分组，否则后写入的一方会覆盖另一方的改动。
 :::
 
 ## 没有分组级标记已读

@@ -7,14 +7,11 @@
 | `SUPSUB_NO_BROWSER` | 真值时 `auth login` 不自动打开浏览器 | 未设 |
 | `SUPSUB_NO_SPINNER` | 真值时关闭所有 loading 动画（非 TTY 下本就不渲染） | 未设 |
 | `SUPSUB_NO_SKILLS_NOTIFIER` | 真值时关闭「本地 skills 落后」的启动提示 | 未设 |
-| `SUPSUB_CONFIG_DIR` | 覆盖配置目录（凭证存于 `<dir>/config.json`，状态存于 `<dir>/skills-state.json`） | `~/.supsub` |
+| `SUPSUB_CONFIG_DIR` | 覆盖配置 / 状态文件目录 | `~/.supsub` |
 
-## 凭证存储与优先级
+## 凭证存储
 
-凭证保存在 `~/.supsub/config.json`（目录 `0700` / 文件 `0600`）。每次请求按以下优先级取凭证，靠前者胜出：
-
-1. 配置文件中的设备流令牌（`access_token`，可自动续期）
-2. 配置文件中手动粘贴的浏览器会话 token（`bearer_token`，无续期通道）
+凭证由 `supsub auth login` 写入 `~/.supsub/config.json`（目录 `0700` / 文件 `0600`），请求时自动携带，过期自动续期。
 
 任意请求返回 **401** 会自动清除本地凭证，需重新 `supsub auth login`。
 
