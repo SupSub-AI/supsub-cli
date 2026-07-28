@@ -84,6 +84,20 @@ export type SearchResponse = {
   prompts: string[];
 };
 
+/**
+ * search 的 JSON 输出形态：CONTENT 结果补 `publishedAtText`（同 contents 的做法）。
+ * 不然 agent 拿到的只有 Unix 秒，每次都得额外跑一趟 `date -r` 去转。
+ */
+export type ContentBasicJson = ContentBasic & { publishedAtText: string };
+
+export type SearchResultItemJson =
+  | { type: 'SOURCE'; data: SourceBasic }
+  | { type: 'CONTENT'; data: ContentBasicJson };
+
+export type SearchResponseJson = Omit<SearchResponse, 'results'> & {
+  results: SearchResultItemJson[];
+};
+
 // ─── MP 搜索任务 ─────────────────────────────────────────────
 export type MpSearchTaskResult = {
   finished: boolean;

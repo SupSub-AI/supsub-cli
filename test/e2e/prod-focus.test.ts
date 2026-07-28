@@ -17,7 +17,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-const BEARER = process.env.SUPSUB_E2E_BEARER || process.env.SUPSUB_API_KEY;
+const BEARER = process.env.SUPSUB_E2E_BEARER;
 const SKIP = !BEARER;
 
 const ENTRY = 'src/index.ts';
@@ -31,13 +31,20 @@ async function runCli(
   const env: Record<string, string> = {
     ...(process.env as Record<string, string>),
   };
-  if (opts.tmpHome) env.HOME = opts.tmpHome;
-  // 清掉本机 SUPSUB_API_KEY，避免抢 source=env 优先级
-  delete env.SUPSUB_API_KEY;
 
-  const finalArgs = opts.withAuth
-    ? ['run', ENTRY, '--api-key', BEARER!, ...args]
-    : ['run', ENTRY, ...args];
+  if (opts.tmpHome) {
+    env.HOME = opts.tmpHome;
+    // 用 tmpHome 下的 .supsub 作为隔离配置目录，覆盖继承来的全局 preload 目录。
+    // withAuth 时把真实 BEARER 写进 config.json 的 access_token（等价于旧 --api-key 直登，
+    // 只写 access_token、不写 refresh_token，保持凭证一次性、不触发续期）；否则写空对象模拟未登录。
+    const configDir = path.join(opts.tmpHome, '.supsub');
+    env.SUPSUB_CONFIG_DIR = configDir;
+    await fs.mkdir(configDir, { recursive: true });
+    const cfg = opts.withAuth ? { access_token: BEARER, client_id: 'supsub-cli' } : {};
+    await fs.writeFile(path.join(configDir, 'config.json'), JSON.stringify(cfg));
+  }
+
+  const finalArgs = ['run', ENTRY, ...args];
 
   return await new Promise<CliResult>((resolve, reject) => {
     const child = spawn('bun', finalArgs, { env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -111,7 +118,7 @@ describe.skipIf(SKIP)('e2e/prod-focus - 关注点命令打测试环境（只读�
     expect(Array.isArray(body.data)).toBe(true);
     // 若有内容，校验关键字段齐全（关注点聚合多源，必带 sourceType/sourceName）
     for (const c of body.data) {
-      expect(typeof c.articleId).toBe('string');
+      expect(typeof c.contentId).toBe('string');
       expect(typeof c.sourceType).toBe('string');
       expect(typeof c.sourceName).toBe('string');
       expect(typeof c.isRead).toBe('boolean');

@@ -1,9 +1,6 @@
-# SupSub CLI 安装指南
+# 安装
 
-> 本指南面向 **AI Agent 与终端用户**：以下步骤可由 agent 按序执行；其中「登录」涉及浏览器授权，需用户协助完成。
-> 本文只讲「如何装上并登录到可用」；完整命令清单见 [`cli-features.md`](./cli-features.md)，设备授权时序见 [`cli-auth-flow.md`](./cli-auth-flow.md)。
-
----
+本文只讲「如何装上并登录到可用」；完整命令清单见[命令参考](/reference/)。
 
 ## 环境要求
 
@@ -11,8 +8,6 @@
 - **支持平台**：macOS（x64 / arm64）、Linux（x64 / arm64）、Windows（x64）。
 - **包管理器**：npm（推荐）或 pnpm。
 - **网络**：安装期间需访问 `registry.npmjs.org` 与 `github.com`（postinstall 从 GitHub Release 下载对应平台 binary）。
-
----
 
 ## 第 1 步　安装
 
@@ -22,24 +17,26 @@ npm i -g @supsub/cli
 
 安装过程中 postinstall 会自动从 GitHub Release 下载与当前系统匹配的预编译 binary，并在全局 bin 目录创建 `supsub` 链接。看到 `supsub installed at …` 即安装成功。
 
-> 也可用 pnpm：`pnpm add -g @supsub/cli`。注意 postinstall 的链接逻辑以 **npm 全局 bin** 为准；若用 pnpm 安装后 `supsub` 不在 `PATH`，请确认 npm 全局 bin 目录（`npm prefix -g`/bin）已加入 `PATH`，或改用 `npm i -g`。
+::: tip 用 pnpm 安装
+也可用 `pnpm add -g @supsub/cli`。注意 postinstall 的链接逻辑以 **npm 全局 bin** 为准；若用 pnpm 安装后 `supsub` 不在 `PATH`，请确认 npm 全局 bin 目录（`npm prefix -g` 下的 `bin`）已加入 `PATH`，或改用 `npm i -g`。
+:::
 
----
+## 第 2 步　配置 Agent Skills
 
-## 第 2 步　配置 Agent Skills（必须）
-
-在 Claude Code / Cursor 等 agent 中使用 supsub 时，**必须**安装配套技能包，agent 才能用自然语言正确驱动 supsub：
+在 Claude Code / Cursor 等 agent 中使用 supsub 时，**需要**安装配套技能包，agent 才能用自然语言正确驱动 supsub：
 
 ```shell
 # Claude Code 插件市场
 /plugin marketplace add SupSub-AI/supsub-cli
 /plugin install supsub-cli@supsub
+```
 
+```shell
 # 其他兼容 agent（skills CLI）：静默安装仓库内全部 skills 到当前项目（./.agents/skills/）
 npx -y skills add SupSub-AI/supsub-cli --skill '*' -y
 ```
 
----
+详见[让 AI 助手帮你用](/agents/)。纯手工使用终端可跳过此步。
 
 ## 第 3 步　登录
 
@@ -56,7 +53,7 @@ supsub auth login
 SUPSUB_NO_BROWSER=1 supsub auth login
 ```
 
----
+凭证优先级与令牌续期见[登录与凭证](./auth)。
 
 ## 第 4 步　验证
 
@@ -70,8 +67,6 @@ supsub auth status
 supsub --output json auth status
 ```
 
----
-
 ## 升级
 
 ```shell
@@ -79,24 +74,7 @@ supsub update            # 自更新到最新版本（下载新 binary 原地替
 supsub update --check    # 只检查是否有新版本，不实际更新
 ```
 
-也可用包管理器：`npm i -g @supsub/cli@latest`（会触发 postinstall 重新下载 binary）。
-
-> 自更新从 npm registry 查最新版本，再从 GitHub Release 下载对应平台 binary、原地替换正在运行的可执行文件。若全局安装目录无写权限（如装在需 sudo 的路径），会提示改用包管理器或加 `sudo` 重试。
-
-### Skills 同步（升级后让本地 skills 跟上）
-
-CLI 自更新只换二进制；若你在 agent 里用了配套 skills，升级后本地 skills 需同步到新版本：
-
-```shell
-supsub skills sync       # 同步本地 skills 到当前 CLI 版本（默认仅装当前项目；--global 装到全局、--force 强制重装）
-supsub skills status     # 查看本地 skills 版本与当前 CLI 版本是否一致
-```
-
-`supsub update` 会在替换二进制后自动执行一次同步；若用 `npm i -g` 等方式绕过了 `supsub update`，
-下次运行任意 supsub 命令时会在 stderr 提示「本地 skills 落后」，按提示 `supsub skills sync` 即可。
-关闭该提示：`SUPSUB_NO_SKILLS_NOTIFIER=1`。完整时序见 [`self-update-flow.md`](./self-update-flow.md)。
-
----
+也可用包管理器：`npm i -g @supsub/cli@latest`（会触发 postinstall 重新下载 binary）。完整说明见[升级与 Skills 同步](./updating)。
 
 ## 卸载
 

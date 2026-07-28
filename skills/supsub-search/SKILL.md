@@ -1,6 +1,6 @@
 ---
 name: supsub-search
-version: 0.1.2
+version: 0.1.3
 description: SupSub 全文搜索 —— 在订阅源（公众号 / 网站）和文章正文里跨源搜索内容。用户说「搜一下 X 相关的内容 / 文章」「在 supsub 里搜 X」「查 X 相关文章」「全文搜索 X」「找 X 的内容」「search articles/content in SupSub」时使用本 skill。⚠️ 范围判定看**动词意图**：「搜 / 查 / 全文搜 X」是检索意图 → 走本 skill（全站）；但「**看一下最近 X 的内容**」「X 最近有什么」「X 更新了吗」是**浏览某个主体的内容流**，必须先用 `supsub sub list` / `supsub focus list` 比对 X 是不是用户已订阅的源名或关注点标题，命中就改走 supsub-sub / supsub-focus，**不要直接全站搜**。若用户明确说「我的订阅 / 我的公众号 / 我的网站」→ supsub-sub，「我的关注点」→ supsub-focus。注意：本 skill 用于搜「内容 / 文章 / 订阅源标题」；如果用户想发现一个新的微信公众号本身（拿 mpId 准备订阅），改用 supsub-mp。
 ---
 
@@ -75,10 +75,12 @@ JSON shape: `{"success":true,"data":{"results":[...],"recommendations":[...],"pr
 { "type": "SOURCE", "data": { "sourceType": "MP", "sourceId": 12345, "isSubscribed": false, "img": "...", "name": "...", "description": "...", "introduction": "...", "url": "..." } }
 
 // 文章结果（type=CONTENT 时）
-{ "type": "CONTENT", "data": { "contentId": "...", "title": "...", "summary": "...", "url": "...", "coverImage": "...", "publishedAt": 1700000000, "sourceId": 12345, "sourceName": "...", "sourceType": "MP", "isSubscribed": false, "keywords": [...], "tags": [...] } }
+{ "type": "CONTENT", "data": { "contentId": "...", "title": "...", "summary": "...", "url": "...", "coverImage": "...", "publishedAt": 1700000000, "publishedAtText": "2026-01-16 07:30", "sourceId": 12345, "sourceName": "...", "sourceType": "MP", "isSubscribed": false, "keywords": [...], "tags": [...] } }
 ```
 
 `recommendations` 是后端推荐的相关源（`SourceBasic[]`），`prompts` 是后端给的搜索建议词。
+
+> 文章结果的 `publishedAtText`（`"YYYY-MM-DD HH:mm"`）由 CLI 补齐，**直接用它排序/展示即可，不要再自己去转 `publishedAt` 这个 Unix 秒**（原字段保留只为方便数值排序）。`SOURCE` 结果没有发布时间，不带该字段。
 
 ---
 
@@ -90,4 +92,4 @@ JSON shape: `{"success":true,"data":{"results":[...],"recommendations":[...],"pr
 - 搜文章拿全文：`supsub search "<词>" --type CONTENT -o json` 拿到 `contentId` 与 `sourceId`，目前 CLI 没有"按 contentId 取文章详情"命令，需要通过 `supsub sub contents --source-id <id> --type <T>` 在该源内浏览。
 - `data.results[].data.isSubscribed` 字段可以判断当前结果是否已经订阅，避免重复 `sub add`。
 - CLI 一次最多返回 10 条结果（后端默认 `pageSize=10`），不支持翻页；如果想要更多结果，调整关键词缩小或扩大搜索范围。
-- Exit codes：`0` OK，`2` UNAUTHORIZED，`64` INVALID_ARGS（`--type` 不在白名单时），`10`/`11` 网络/服务端错误。
+- Exit codes：`0` OK，`1` 业务错误（后端 4xx），`2` UNAUTHORIZED，`64` INVALID_ARGS（`--type` 不在白名单时），`10` 网络错误，`11` 服务端错误（5xx）。

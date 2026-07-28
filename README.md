@@ -7,6 +7,8 @@
 
 [SupSub](https://supsub.net) 的命令行工具，让你在终端里直接管理订阅源、搜索内容、追踪公众号、网站。
 
+📖 **[完整文档站](https://supsub-ai.github.io/supsub-cli/)** —— [快速上手](https://supsub-ai.github.io/supsub-cli/guide/getting-started) · [核心概念](https://supsub-ai.github.io/supsub-cli/guide/concepts) · [命令参考](https://supsub-ai.github.io/supsub-cli/reference/) · [Agent 集成](https://supsub-ai.github.io/supsub-cli/agents/)
+
 ---
 
 ## 安装

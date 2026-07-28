@@ -1,0 +1,101 @@
+/**
+ * 与 supsub.net 保持一致的主题色。
+ *
+ * 色值直接取自官网运行时的 CSS 自定义属性（官网用 oklch 定义调色板），
+ * 亮 / 暗两套分别对应官网 :root 与 .dark：
+ *   品牌色  亮 oklch(58.4% .15 41) ≈ #c2562b   暗 oklch(72% .15 38) ≈ #f27f5c
+ *   背景色  亮 oklch(97.2% .004 95)            暗 oklch(19.5% .01 55) ≈ #191411
+ * 改动前请先对照官网，别在这里凭感觉调色。
+ */
+
+:root {
+  /* ── 品牌色 ───────────────────────────────────────── */
+  /* 官网品牌色原值，用于实心填充（按钮、徽标） */
+  --ss-brand: oklch(58.4% 0.15 41);
+  /* 正文链接偏暗一档，保证在米白底上达到 WCAG AA 对比度 */
+  --ss-brand-text: oklch(52% 0.15 41);
+  /* hover / active 再深一档 */
+  --ss-brand-deep: oklch(46% 0.14 41);
+
+  --vp-c-brand-1: var(--ss-brand-text);
+  --vp-c-brand-2: var(--ss-brand);
+  --vp-c-brand-3: var(--ss-brand);
+  --vp-c-brand-soft: oklch(58.4% 0.15 41 / 0.14);
+
+  /* ── 背景层次 ─────────────────────────────────────── */
+  --vp-c-bg: oklch(97.2% 0.004 95);
+  --vp-c-bg-alt: oklch(94.5% 0.005 92);
+  --vp-c-bg-soft: oklch(94.5% 0.005 92);
+  --vp-c-bg-elv: oklch(99% 0.003 95);
+
+  /* ── 文字 ─────────────────────────────────────────── */
+  --vp-c-text-1: oklch(18% 0.013 55);
+  --vp-c-text-2: oklch(36% 0.013 55);
+  --vp-c-text-3: oklch(52% 0.012 60);
+
+  /* ── 描边 ─────────────────────────────────────────── */
+  --vp-c-divider: oklch(93% 0.005 90);
+  --vp-c-border: oklch(88% 0.006 88);
+  --vp-c-gutter: oklch(93% 0.005 90);
+
+  /* ── 实心按钮 ─────────────────────────────────────── */
+  --vp-button-brand-bg: var(--ss-brand);
+  --vp-button-brand-border: var(--ss-brand);
+  --vp-button-brand-text: #fff;
+  --vp-button-brand-hover-bg: var(--ss-brand-deep);
+  --vp-button-brand-hover-border: var(--ss-brand-deep);
+  --vp-button-brand-hover-text: #fff;
+  --vp-button-brand-active-bg: var(--ss-brand-deep);
+  --vp-button-brand-active-border: var(--ss-brand-deep);
+  --vp-button-brand-active-text: #fff;
+
+  /* ── 首页 hero 标题：官网同款暖橙渐变 ─────────────── */
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(
+    120deg,
+    oklch(58.4% 0.15 41),
+    oklch(68% 0.13 62)
+  );
+}
+
+.dark {
+  --ss-brand: oklch(72% 0.15 38);
+  /* 暗色底上链接需要更亮而非更暗 */
+  --ss-brand-text: oklch(78% 0.14 40);
+  --ss-brand-deep: oklch(66% 0.15 38);
+
+  --vp-c-brand-1: var(--ss-brand-text);
+  --vp-c-brand-2: var(--ss-brand);
+  --vp-c-brand-3: var(--ss-brand-deep);
+  --vp-c-brand-soft: oklch(72% 0.15 38 / 0.16);
+
+  --vp-c-bg: oklch(19.5% 0.01 55);
+  --vp-c-bg-alt: oklch(16.5% 0.009 55);
+  --vp-c-bg-soft: oklch(23.5% 0.011 55);
+  --vp-c-bg-elv: oklch(23.5% 0.011 55);
+
+  --vp-c-text-1: oklch(93% 0.012 75);
+  --vp-c-text-2: oklch(78% 0.011 70);
+  --vp-c-text-3: oklch(60% 0.011 65);
+
+  --vp-c-divider: oklch(30% 0.012 60);
+  --vp-c-border: oklch(30% 0.012 60);
+  --vp-c-gutter: oklch(25% 0.01 58);
+
+  /* 暗色下品牌色是亮橙，按钮文字反过来用深色（与官网 --primary-foreground 一致） */
+  --vp-button-brand-bg: var(--ss-brand);
+  --vp-button-brand-border: var(--ss-brand);
+  --vp-button-brand-text: oklch(18% 0.02 50);
+  --vp-button-brand-hover-bg: var(--ss-brand-text);
+  --vp-button-brand-hover-border: var(--ss-brand-text);
+  --vp-button-brand-hover-text: oklch(18% 0.02 50);
+  --vp-button-brand-active-bg: var(--ss-brand-deep);
+  --vp-button-brand-active-border: var(--ss-brand-deep);
+  --vp-button-brand-active-text: oklch(18% 0.02 50);
+
+  --vp-home-hero-name-background: linear-gradient(
+    120deg,
+    oklch(72% 0.15 38),
+    oklch(82% 0.12 64)
+  );
+}

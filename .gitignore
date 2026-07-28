@@ -10,3 +10,6 @@ coverage/
 api.json
 .claude/
 /local/
+
+# VitePress（dist/ 已被上面的通配规则覆盖）
+docs/.vitepress/cache/

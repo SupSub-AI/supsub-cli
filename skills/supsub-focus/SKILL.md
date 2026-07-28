@@ -1,6 +1,6 @@
 ---
 name: supsub-focus
-version: 0.1.3
+version: 0.1.4
 description: SupSub 关注点（focus）管理 —— 列出我的关注点、查看某个关注点里聚合的内容/文章（按已读/未读筛选，支持翻页）、把整个关注点标记为已读、删除关注点。匹配「我的关注点」「关注点列表」「我关注了哪些」「我关注的内容」「看 X 关注点里有哪些内容/文章」「关注点 X 有哪些未读」「关注点还有多少没读」「这个关注点我看完了 / 把关注点标为已读」「删除关注点 X」。⚠️ 已读只有**整个关注点**一档（`mark-read --all`，不可逆）：文章没有「详情 / 阅读」这一步，故不支持单篇标记已读。⚠️ 也匹配**用主题名指代自己关注点**的浏览句式：「看一下最近 X 的内容」「X 最近有什么」—— 遇到这类请求先 `supsub focus list` 比对 X 是不是已有关注点的标题（包含匹配、忽略大小写），命中就用 `focus contents` 拉该关注点内容；若 X 同时命中订阅源名，把两边都列出来让用户选；两边都没命中则直接改用 supsub-search 执行全站搜索（**不要反问用户要不要搜**），**不要**默认当成全站关键词搜索。关注点是跨多来源（公众号 MP / 网站 WEBSITE / 推特 X）按主题聚合的内容流。⚠️ 动词判别：「关注 / 关注了 / 我关注了哪些 / 关注点」都归本 skill（focus）；只有「订阅 / 订阅了」才走 supsub-sub（订阅源）。不用于订阅源的增删查（走 supsub-sub），也不用于全文关键词搜索（走 supsub-search）。CLI 没有新增关注点的命令，删除不可逆。
 ---
 
@@ -108,6 +108,9 @@ supsub focus mark-read --id <focusId> --all
 > ⚠️ **只支持整个关注点已读，没有单篇已读。** 文章没有「详情 / 阅读」这一步，产生不了自然的单篇已读事件，所以 CLI 只保留用户明确表达的「这个关注点我看完了」。传 `--content-id` / `--type` / `--source-type` 会抛 `INVALID_ARGS`。用户说「把这篇标为已读」时如实说明不支持。
 >
 > ⚠️ **`--all` 必填且不可逆**（无 mark-as-unread）。执行前必须向用户**二次确认**：复述关注点标题 + 当前 `unreadCount`，获得明确同意后才执行。
+>
+> **CLI 不会再问一次**：这条命令（以及 `focus remove`）没有交互式确认提示，一执行就生效。若把命令交给用户自己在终端跑，
+> **不要说「执行后 CLI 会提示确认」**——那是不存在的安全网。
 
 ```bash
 # 整个关注点已读（需用户确认后执行）
@@ -159,4 +162,4 @@ JSON shape: `{"success":true,"data":{"message":"..."}}`
 - `focus contents` 默认每页 20 条，用 `--page` / `--page-size`（上限 100）翻页取更早的内容。
 - `focus mark-read` 只做整个关注点已读（单篇已读不支持：文章没有详情/阅读这一步）；**`--all` 必填且不可逆，执行前必须向用户二次确认**。
 - **本 skill 不负责**：订阅源增删查（→ `supsub-sub`）、订阅分组（→ `supsub-group`）、跨源未读概览与清未读工作流（→ `supsub-unread`）、按关键词全文搜索（→ `supsub-search`）、发现新公众号（→ `supsub-mp`）。focus 没有 add。
-- Exit codes：`0` OK，`2` UNAUTHORIZED，`64` INVALID_ARGS（`--id` / `--page` / `--page-size` 校验失败、`--all` 与 `--unread` 互斥、mark-read 未给 `--all` 或误传单篇参数），其他网络/服务端错误 `10` / `11`。
+- Exit codes：`0` OK，`2` UNAUTHORIZED，`64` INVALID_ARGS（`--id` / `--page` / `--page-size` 校验失败、`--all` 与 `--unread` 互斥、mark-read 未给 `--all` 或误传单篇参数），`1` 业务错误（后端 4xx，如关注点不存在），`10` 网络错误，`11` 服务端错误（5xx）。

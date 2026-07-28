@@ -2,7 +2,13 @@
 import type { Command } from 'commander';
 import { searchAll } from '../api/search.ts';
 import type { ErrorEnvelope } from '../lib/errors.ts';
-import type { SearchResultItem, SourceBasic } from '../lib/types.ts';
+import { formatDate } from '../lib/format-date.ts';
+import type {
+  SearchResponse,
+  SearchResponseJson,
+  SearchResultItem,
+  SourceBasic,
+} from '../lib/types.ts';
 import { output } from '../ui/output.ts';
 import { withSpinner } from '../ui/spinner.ts';
 import { printTable, truncate } from '../ui/table.ts';
@@ -27,6 +33,18 @@ function sourceKindLabel(sourceType: string): string {
 function resultKindLabel(item: SearchResultItem): string {
   if (item.type === 'CONTENT') return '文章';
   return sourceKindLabel((item.data as SourceBasic).sourceType);
+}
+
+/** 补 publishedAtText，省得调用方（尤其 agent）自己去转 Unix 时间戳（同 sub/focus contents） */
+function withPublishedAtText(d: SearchResponse): SearchResponseJson {
+  return {
+    ...d,
+    results: (d.results ?? []).map((item) =>
+      item.type === 'CONTENT'
+        ? { ...item, data: { ...item.data, publishedAtText: formatDate(item.data.publishedAt) } }
+        : item,
+    ),
+  };
 }
 
 function renderResultItem(item: SearchResultItem): string[] {
@@ -76,7 +94,7 @@ export function registerSearch(program: Command): void {
         }),
       );
 
-      output(data, fmt, (d) => {
+      output(withPublishedAtText(data), fmt, (d) => {
         const results = d.results ?? [];
 
         // Results 表

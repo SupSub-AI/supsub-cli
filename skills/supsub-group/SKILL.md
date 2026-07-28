@@ -1,6 +1,6 @@
 ---
 name: supsub-group
-version: 0.1.0
+version: 0.1.2
 description: SupSub 订阅分组管理 —— 创建 / 重命名 / 删除分组，查看分组内订阅源（带未读数），把订阅源加入 / 移出分组。匹配「我的分组」「新建 / 创建一个分组」「把 XX 加到 YY 分组」「把 XX 从分组移出 / 移除」「YY 分组里有哪些订阅」「这个分组还有多少未读」「重命名分组」「删除分组」「整理订阅 / 给订阅分个类」。⚠️ 消歧：**分组（group）**是把已订阅的源收纳起来的"文件夹"，按 sourceId+sourceType 组织；**关注点（focus）**是 AI 按主题聚合的内容流（「我的关注点 / 我关注了哪些」→ supsub-focus）；订阅源本身的订阅 / 退订走 supsub-sub。删除分组不可逆（组内订阅源本身不受影响）。
 ---
 
@@ -51,7 +51,14 @@ supsub group add "AI 周报"
 supsub group add 财经 -o json
 ```
 
-JSON shape: `{"success":true,"data":{"id":1182,"name":"AI 周报"}}` —— 返回里直接带新分组 `id`，可立刻接 `add-sub` / `sub add --group` 使用。
+JSON shape: `{"success":true,"data":{"id":1182,"name":"AI 周报"}}` —— 返回里直接带新分组 `id`，可立刻接 `add-sub` / `sub add --group` 使用（已实测）。
+
+> ⚠️ **分组名不可重复**：已存在同名分组时报 `ResourceExists`（409 → exit `1`），**不会**返回已有分组的 id。
+>
+> 因此「把 X 订上并归到『效率』组里」这类请求的正确顺序是：**先 `group list` 找同名分组**，
+> 命中就复用它的 `id`，没命中才 `group add`。上来就 `group add` 会在分组已存在时白白失败一次。
+> 若 `group list` 没有该分组，直接建即可（建分组是无损操作，不用反问用户）——但**建之前顺带说一句
+> 「『效率』组不存在，我新建一个」**，因为用户很可能只是把组名记错了。
 
 ---
 
@@ -87,6 +94,9 @@ supsub group remove --id 1182
 JSON shape: `{"success":true,"data":{"message":"已删除分组"}}`
 
 > ⚠️ **破坏性且不可逆**：执行前必须向用户**二次确认**——复述分组名（从 `group list` 取），获得用户明确同意后才执行。组内订阅源本身不会被退订，只是失去这个文件夹。
+>
+> **CLI 不会再问一次**：`group remove` 没有交互式确认提示，一执行就删掉。确认只发生在你和用户之间。
+> 若把命令交给用户自己执行，**不要说「CLI 会让你确认」**——如实说明它一跑就生效。
 
 ---
 
@@ -172,4 +182,5 @@ JSON shape: `{"success":true,"data":{"message":"已将订阅源移出分组"}}`
 - 分组成员的 `sourceType` 可能出现 `PODCAST` / `NEWSLETTER`（网页端加入），`group subs --type` 可过滤它们；但 `add-sub` 只接受 `MP|WEBSITE|X`。
 - **没有分组级标记已读命令**。用户说「把这个分组全部标记已读」时：先 `group subs` 列出组内源与各自 `unreadCount`，复述范围并获得确认，再逐个 `sub mark-read --source-id <sid> --type <t> --all`（每个源都不可逆）。也没有单篇已读——详见 `supsub-unread`。
 - **本 skill 不负责**：订阅/退订源（→ `supsub-sub`）、关注点（→ `supsub-focus`）、未读工作流（→ `supsub-unread`）。
-- Exit codes：`0` OK（含幂等提示），`2` UNAUTHORIZED，`64` INVALID_ARGS（`--id` 空 / `--type` 非法 / `--source-id` 非正整数），`10` 网络错误，`11` 服务端/业务错误（如分组不存在 404 NotFound）。
+- Exit codes：`0` OK（含幂等提示），**`1` 业务错误（后端 4xx，如分组不存在 404 NotFound）**，`2` UNAUTHORIZED，`64` INVALID_ARGS（`--id` 空 / `--type` 非法 / `--source-id` 非正整数），`10` 网络错误，`11` 服务端错误（5xx）。
+  > 按退出码分支时注意：`1` 和 `11` 不是一回事——`分组不存在` 这类业务失败是 `1`，`11` 只在后端 5xx 时出现。

@@ -47,7 +47,15 @@
     "lint": "biome check src test",
     "lint:fix": "biome check --write src test",
     "format": "biome format --write src test",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "postinstall": "node scripts/postinstall.cjs"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "dependencies": {
     "cli-table3": "^0.6.5",
@@ -58,6 +66,7 @@
     "@biomejs/biome": "2.4.13",
     "@types/node": "^22.7.5",
     "bun-types": "latest",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitepress": "1.6.4"
   }
 }

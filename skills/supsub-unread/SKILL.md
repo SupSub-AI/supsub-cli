@@ -1,6 +1,6 @@
 ---
 name: supsub-unread
-version: 0.1.1
+version: 0.1.2
 description: SupSub 未读管理（工作流）—— 一条命令看全所有订阅源与关注点的未读数（supsub unread），钻取未读文章列表（sub contents / focus contents，支持 --page 翻页），并把某个订阅源 / 某个关注点**整体**标记已读（sub mark-read --all / focus mark-read --all）。匹配「我还有什么没读 / 没看的」「有多少未读」「未读概览」「哪些号还有没读的」「帮我清未读」「这个号我读完了」「这个关注点全部标记已读」「全部已读」。⚠️ 标记已读**只有整源 / 整个关注点一档**，不支持单篇：文章没有「详情 / 阅读」这一步，产生不了自然的单篇已读事件。⚠️ `--all` 标记已读**不可逆**（无 mark-as-unread 命令），执行前必须向用户二次确认。只是浏览某个源 / 关注点的文章列表走 supsub-sub / supsub-focus；分组维度的未读数走 supsub-group（group subs）。
 ---
 
@@ -48,6 +48,11 @@ description: SupSub 未读管理（工作流）—— 一条命令看全所有�
 1. **复述影响范围**：源/关注点名称 + 当前 `unreadCount`（从 `supsub unread` 或 list 命令取）；
 2. **明确询问用户**并获得肯定答复；
 3. 才可执行。**未经确认不得执行**——操作不可逆，没有 mark-as-unread。
+
+> ⚠️ **CLI 自己不会再问一次。** `mark-read --all`（以及 `group remove` / `focus remove`）没有任何交互式确认提示，
+> 命令一跑就立即生效。确认这一步**只存在于你和用户之间**，CLI 层没有兜底。
+> 因此，**当你把命令交给用户自己在终端执行时（例如被权限/护栏挡住），绝不能说「执行后 CLI 会提示你确认」**——
+> 那是不存在的安全网，用户照做会直接清空整个源。如实说明「这条命令一执行就生效、不可撤销」。
 
 用户笼统说「都标已读 / 清未读」时：先展示未读概览，**逐项确认**，不要自作主张把所有源循环清一遍。
 
@@ -128,4 +133,4 @@ JSON shape: `{"success":true,"data":{"message":"已标记该关注点全部内�
 - **`--all` 必须先向用户二次确认**（复述范围 + 未读数 → 明确同意 → 执行）；标记完成后复述实际执行的范围，可用 `supsub unread` 复查归零。
 - 没有 mark-as-unread：标错了无法恢复。宁可一次只清一个源，也不要批量循环。
 - **本 skill 不负责**：订阅/退订（→ `supsub-sub`）、关注点删除（→ `supsub-focus`）、分组管理（→ `supsub-group`）、关键词搜索（→ `supsub-search`）。
-- Exit codes：`0` OK，`2` UNAUTHORIZED，`64` INVALID_ARGS（未给 `--all`、误传单篇参数、ID 非法），`10` 网络错误，`11` 服务端/业务错误。
+- Exit codes：`0` OK，`1` 业务错误（后端 4xx，如源/关注点不存在），`2` UNAUTHORIZED，`64` INVALID_ARGS（未给 `--all`、误传单篇参数、ID 非法），`10` 网络错误，`11` 服务端错误（5xx）。
