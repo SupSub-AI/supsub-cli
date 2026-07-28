@@ -12,7 +12,14 @@ async function cleanupAuthFields(): Promise<void> {
   try {
     const content = await fs.readFile(CONFIG_FILE, 'utf-8');
     const parsed = JSON.parse(content) as Record<string, unknown>;
-    const { api_key: _a, client_id: _c, bearer_token: _b, ...rest } = parsed;
+    const {
+      access_token: _at,
+      refresh_token: _rt,
+      api_key: _a,
+      client_id: _c,
+      bearer_token: _b,
+      ...rest
+    } = parsed;
     await fs.writeFile(CONFIG_FILE, JSON.stringify(rest, null, 2), 'utf-8');
   } catch {
     // 文件不存在则忽略
@@ -55,7 +62,14 @@ describe('commands/auth/logout - 清除本地认证', () => {
     await fs.writeFile(
       CONFIG_FILE,
       JSON.stringify(
-        { api_key: 'sk_logout_test', client_id: 'supsub-cli', bearer_token: 'tk' },
+        {
+          access_token: 'sk_logout_test',
+          refresh_token: 'r_logout_test',
+          client_id: 'supsub-cli',
+          bearer_token: 'tk',
+          // 老配置残留：CLI 早已不写这个字段，但 logout 仍要把它清掉
+          api_key: 'sk_legacy',
+        },
         null,
         2,
       ),
@@ -69,14 +83,16 @@ describe('commands/auth/logout - 清除本地认证', () => {
     await cleanupAuthFields();
   });
 
-  test('logout 后 config 中 api_key/client_id/bearer_token 全部被移除', async () => {
+  test('logout 后 config 中的认证字段全部被移除（含老配置残留的 api_key）', async () => {
     const program = buildProgram();
     await program.parseAsync(['node', 'supsub', 'auth', 'logout']);
 
     const after = JSON.parse(await fs.readFile(CONFIG_FILE, 'utf-8')) as Record<string, unknown>;
-    expect(after.api_key).toBeUndefined();
+    expect(after.access_token).toBeUndefined();
+    expect(after.refresh_token).toBeUndefined();
     expect(after.client_id).toBeUndefined();
     expect(after.bearer_token).toBeUndefined();
+    expect(after.api_key).toBeUndefined();
   });
 
   test('logout 输出「已登出」到 stderr', async () => {

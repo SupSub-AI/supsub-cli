@@ -13,7 +13,14 @@ async function cleanupAuthFields(): Promise<void> {
   try {
     const content = await fs.readFile(CONFIG_FILE, 'utf-8');
     const parsed = JSON.parse(content) as Record<string, unknown>;
-    const { api_key: _a, client_id: _c, bearer_token: _b, ...rest } = parsed;
+    const {
+      access_token: _at,
+      refresh_token: _rt,
+      api_key: _a,
+      client_id: _c,
+      bearer_token: _b,
+      ...rest
+    } = parsed;
     await fs.writeFile(CONFIG_FILE, JSON.stringify(rest, null, 2), 'utf-8');
   } catch {
     /* ignore */
@@ -94,7 +101,7 @@ describe('commands/focus/contents - 查看关注点内容', () => {
     await fs.mkdir(CONFIG_DIR, { recursive: true });
     await fs.writeFile(
       CONFIG_FILE,
-      JSON.stringify({ api_key: 'sk_focus_ok', client_id: 'supsub-cli' }, null, 2),
+      JSON.stringify({ access_token: 'sk_focus_ok', client_id: 'supsub-cli' }, null, 2),
       'utf-8',
     );
 

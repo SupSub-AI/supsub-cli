@@ -18,7 +18,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-const BEARER = process.env.SUPSUB_E2E_BEARER || process.env.SUPSUB_API_KEY;
+const BEARER = process.env.SUPSUB_E2E_BEARER;
 const MUTATE = process.env.SUPSUB_E2E_MUTATE === '1';
 const SKIP_READONLY = !BEARER;
 const SKIP_MUTATE = !BEARER || !MUTATE;
@@ -30,10 +30,19 @@ type CliResult = { stdout: string; stderr: string; code: number };
 async function runCli(args: string[], tmpHome: string): Promise<CliResult> {
   const env: Record<string, string> = { ...(process.env as Record<string, string>) };
   env.HOME = tmpHome;
-  delete env.SUPSUB_API_KEY;
+  // 用 tmpHome 下的 .supsub 作为隔离配置目录，覆盖继承来的全局 preload 目录。
+  // 把真实 BEARER 写进 config.json 的 access_token（等价于旧 --api-key 直登，
+  // 只写 access_token、不写 refresh_token，保持凭证一次性、不触发续期）。
+  const configDir = path.join(tmpHome, '.supsub');
+  env.SUPSUB_CONFIG_DIR = configDir;
+  await fs.mkdir(configDir, { recursive: true });
+  await fs.writeFile(
+    path.join(configDir, 'config.json'),
+    JSON.stringify({ access_token: BEARER, client_id: 'supsub-cli' }),
+  );
 
   return await new Promise<CliResult>((resolve, reject) => {
-    const child = spawn('bun', ['run', ENTRY, '--api-key', BEARER!, ...args], {
+    const child = spawn('bun', ['run', ENTRY, ...args], {
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });

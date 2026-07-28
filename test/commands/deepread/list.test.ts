@@ -3,13 +3,13 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import * as fs from 'node:fs/promises';
 import { Command } from 'commander';
 import { registerDeepReadList } from '../../../src/commands/deepread/list.ts';
-import { setCliApiKey } from '../../../src/http/credentials.ts';
 import {
   type DeepReadEntry,
   deepReadRootDir,
   readEntry,
   writeEntry,
 } from '../../../src/lib/deep-read-store.ts';
+import { setTestCredential } from '../../_helpers/credential.ts';
 
 const DONE_BODY = {
   status: 'done',
@@ -47,11 +47,11 @@ describe('commands/deepread - list', () => {
   let stdoutOutput: string;
   let getCount: number;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     originalFetch = globalThis.fetch;
     originalApiUrl = process.env.SUPSUB_API_URL;
     process.env.SUPSUB_API_URL = 'http://fake-host';
-    setCliApiKey('sk_list_test');
+    await setTestCredential('sk_list_test');
     stdoutOutput = '';
     getCount = 0;
 
@@ -73,7 +73,7 @@ describe('commands/deepread - list', () => {
   afterEach(async () => {
     process.stdout.write = originalStdout;
     globalThis.fetch = originalFetch;
-    setCliApiKey(undefined);
+    await setTestCredential(undefined);
     if (originalApiUrl === undefined) delete process.env.SUPSUB_API_URL;
     else process.env.SUPSUB_API_URL = originalApiUrl;
     await fs.rm(deepReadRootDir(), { recursive: true, force: true });

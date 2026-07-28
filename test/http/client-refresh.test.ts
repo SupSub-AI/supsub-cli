@@ -1,6 +1,6 @@
 // src/http/client.ts：401 自动续期 + 重试的闭环
 //
-// 已有的 client.test.ts 覆盖「api_key 来源 401 → clearAuth」的老行为；
+// 已有的 client.test.ts 覆盖「无续期通道的来源 401 → clearAuth」的老行为；
 // 本文件补的是设备授权来源（config 里有 refresh_token）多出来的一层：
 // 过期先续、401 续了再重试、续不成时该不该登出。
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -14,7 +14,6 @@ const CONFIG_FILE = configFile();
 type Cfg = {
   access_token?: string;
   refresh_token?: string;
-  api_key?: string;
   bearer_token?: string;
   client_id?: string;
 };
@@ -34,19 +33,14 @@ async function readRawConfig(): Promise<Cfg> {
 describe('http/client - 401 自动续期', () => {
   let originalFetch: typeof globalThis.fetch;
   let originalApiUrl: string | undefined;
-  let originalEnvKey: string | undefined;
   let captured: Captured[];
 
   beforeEach(async () => {
     originalFetch = globalThis.fetch;
     originalApiUrl = process.env.SUPSUB_API_URL;
-    originalEnvKey = process.env.SUPSUB_API_KEY;
     process.env.SUPSUB_API_URL = 'http://fake-host';
-    delete process.env.SUPSUB_API_KEY;
     captured = [];
 
-    const { setCliApiKey } = await import('../../src/http/credentials.ts');
-    setCliApiKey(undefined);
     const { __resetRefreshStateForTest } = await import('../../src/http/token-refresh.ts');
     __resetRefreshStateForTest();
   });
@@ -55,8 +49,6 @@ describe('http/client - 401 自动续期', () => {
     globalThis.fetch = originalFetch;
     if (originalApiUrl === undefined) delete process.env.SUPSUB_API_URL;
     else process.env.SUPSUB_API_URL = originalApiUrl;
-    if (originalEnvKey === undefined) delete process.env.SUPSUB_API_KEY;
-    else process.env.SUPSUB_API_KEY = originalEnvKey;
 
     const { __resetRefreshStateForTest } = await import('../../src/http/token-refresh.ts');
     __resetRefreshStateForTest();

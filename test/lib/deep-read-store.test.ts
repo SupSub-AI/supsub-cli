@@ -1,7 +1,6 @@
 // lib/deep-read-store：本地精读缓存的读写、账号隔离、并发安全
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import * as fs from 'node:fs/promises';
-import { setCliApiKey } from '../../src/http/credentials.ts';
 import {
   currentUserKey,
   type DeepReadEntry,
@@ -13,6 +12,7 @@ import {
   removeEntry,
   writeEntry,
 } from '../../src/lib/deep-read-store.ts';
+import { setTestCredential } from '../_helpers/credential.ts';
 import { makeJwt } from '../_helpers/jwt.ts';
 
 function entry(overrides: Partial<DeepReadEntry> = {}): DeepReadEntry {
@@ -29,12 +29,12 @@ function entry(overrides: Partial<DeepReadEntry> = {}): DeepReadEntry {
 }
 
 describe('lib/deep-read-store', () => {
-  beforeEach(() => {
-    setCliApiKey('sk_store_test');
+  beforeEach(async () => {
+    await setTestCredential('sk_store_test');
   });
 
   afterEach(async () => {
-    setCliApiKey(undefined);
+    await setTestCredential(undefined);
     await fs.rm(deepReadRootDir(), { recursive: true, force: true });
   });
 
@@ -109,24 +109,24 @@ describe('lib/deep-read-store', () => {
   });
 
   test('不同账号落到不同子目录，互相看不见', async () => {
-    setCliApiKey(makeJwt({ id: 101 }));
+    await setTestCredential(makeJwt({ id: 101 }));
     await writeEntry(entry({ contentId: 'a' }));
     const keyA = await currentUserKey();
 
-    setCliApiKey(makeJwt({ id: 202 }));
+    await setTestCredential(makeJwt({ id: 202 }));
     const keyB = await currentUserKey();
     expect(keyB).not.toBe(keyA);
     expect(await listEntries()).toHaveLength(0);
 
-    setCliApiKey(makeJwt({ id: 101 }));
+    await setTestCredential(makeJwt({ id: 101 }));
     expect(await listEntries()).toHaveLength(1);
   });
 
   test('JWT 能解出 id 时目录名用 id，非 JWT 凭证退化为哈希', async () => {
-    setCliApiKey(makeJwt({ id: 101 }));
+    await setTestCredential(makeJwt({ id: 101 }));
     expect(await currentUserKey()).toBe('u101');
 
-    setCliApiKey('sk_plain_key');
+    await setTestCredential('sk_plain_key');
     expect(await currentUserKey()).toMatch(/^k[0-9a-f]{16}$/);
   });
 });

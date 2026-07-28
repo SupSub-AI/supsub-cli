@@ -1,10 +1,10 @@
-// packages/cli/test/bearer-token-auth.test.ts
-// add-cli-bearer-token-auth：bearer_token 作为第三种鉴权来源
+// packages/cli/test/http/credentials.test.ts
+// 凭证解析的优先级：access_token（config）> bearer_token（session）。
 //
 // 配置目录由 SUPSUB_CONFIG_DIR 解析，bun preload (test/setup.ts) 已经
 // 把它指向一次性 tmp 目录，afterEach 仅做用例间清理，不会影响本机 ~/.supsub。
 
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 import * as fs from 'node:fs/promises';
 import { configFile } from '../_helpers/config-path.ts';
 
@@ -28,25 +28,8 @@ async function cleanupAuthFields(): Promise<void> {
   }
 }
 
-describe('resolveApiKey - bearer_token 第三种鉴权来源', () => {
-  let originalEnvKey: string | undefined;
-
-  beforeEach(async () => {
-    originalEnvKey = process.env.SUPSUB_API_KEY;
-    delete process.env.SUPSUB_API_KEY;
-    // 清空 CLI flag 覆写，确保每个用例从干净状态开始
-    const { setCliApiKey } = await import('../../src/http/credentials.ts');
-    setCliApiKey(undefined);
-  });
-
+describe('resolveApiKey - 凭证来源与优先级', () => {
   afterEach(async () => {
-    if (originalEnvKey === undefined) {
-      delete process.env.SUPSUB_API_KEY;
-    } else {
-      process.env.SUPSUB_API_KEY = originalEnvKey;
-    }
-    const { setCliApiKey } = await import('../../src/http/credentials.ts');
-    setCliApiKey(undefined);
     await cleanupAuthFields();
   });
 
@@ -60,65 +43,8 @@ describe('resolveApiKey - bearer_token 第三种鉴权来源', () => {
     expect(result.key).toBe('abc.def.ghi');
     expect(result.clientId).toBe('supsub-cli');
     expect(result.source).toBe('session');
-  });
-
-  test('api_key 与 bearer_token 共存时 api_key 胜出', async () => {
-    const { writeConfig } = await import('../../src/config/store.ts');
-    const { resolveApiKey } = await import('../../src/http/credentials.ts');
-
-    await writeConfig({
-      api_key: 'sk_live_xxx',
-      bearer_token: 'browser_token',
-      client_id: 'supsub-cli',
-    });
-
-    const result = await resolveApiKey();
-    expect(result.key).toBe('sk_live_xxx');
-    expect(result.source).toBe('config');
-  });
-
-  test('env SUPSUB_API_KEY 与 bearer_token 共存时 env 胜出', async () => {
-    const { writeConfig } = await import('../../src/config/store.ts');
-    const { resolveApiKey } = await import('../../src/http/credentials.ts');
-
-    await writeConfig({ bearer_token: 'browser_token', client_id: 'supsub-cli' });
-    process.env.SUPSUB_API_KEY = 'env_key';
-
-    const result = await resolveApiKey();
-    expect(result.key).toBe('env_key');
-    expect(result.source).toBe('env');
-  });
-
-  test('--api-key flag 始终最高优先级', async () => {
-    const { writeConfig } = await import('../../src/config/store.ts');
-    const { resolveApiKey, setCliApiKey } = await import('../../src/http/credentials.ts');
-
-    await writeConfig({
-      api_key: 'sk_live_xxx',
-      bearer_token: 'browser_token',
-    });
-    process.env.SUPSUB_API_KEY = 'env_key';
-    setCliApiKey('flag_key');
-
-    const result = await resolveApiKey();
-    expect(result.key).toBe('flag_key');
-    expect(result.source).toBe('flag');
-  });
-
-  test('clearAuth 同时清除 bearer_token', async () => {
-    const { writeConfig, readConfig, clearAuth } = await import('../../src/config/store.ts');
-
-    await writeConfig({
-      api_key: 'k_unit',
-      bearer_token: 't_unit',
-      client_id: 'c_unit',
-    });
-    await clearAuth();
-
-    const cfg = await readConfig();
-    expect(cfg.api_key).toBeUndefined();
-    expect(cfg.bearer_token).toBeUndefined();
-    expect(cfg.client_id).toBeUndefined();
+    // session 来源没有续期通道
+    expect(result.refreshToken).toBeUndefined();
   });
 
   test('仅 access_token 时被识别为 config 来源', async () => {
@@ -130,22 +56,6 @@ describe('resolveApiKey - bearer_token 第三种鉴权来源', () => {
     const result = await resolveApiKey();
     expect(result.key).toBe('acc.token.jwt');
     expect(result.clientId).toBe('supsub-cli');
-    // 复用 'config' 来源，不新增 source 值
-    expect(result.source).toBe('config');
-  });
-
-  test('access_token 与 api_key 共存时 access_token 胜出', async () => {
-    const { writeConfig } = await import('../../src/config/store.ts');
-    const { resolveApiKey } = await import('../../src/http/credentials.ts');
-
-    await writeConfig({
-      access_token: 'acc.token.jwt',
-      api_key: 'sk_live_xxx',
-      client_id: 'supsub-cli',
-    });
-
-    const result = await resolveApiKey();
-    expect(result.key).toBe('acc.token.jwt');
     expect(result.source).toBe('config');
   });
 
@@ -164,16 +74,62 @@ describe('resolveApiKey - bearer_token 第三种鉴权来源', () => {
     expect(result.source).toBe('config');
   });
 
-  test('env SUPSUB_API_KEY 与 access_token 共存时 env 胜出', async () => {
+  test('access_token 带 refresh_token 时一并返回，供续期使用', async () => {
     const { writeConfig } = await import('../../src/config/store.ts');
     const { resolveApiKey } = await import('../../src/http/credentials.ts');
 
-    await writeConfig({ access_token: 'acc.token.jwt', client_id: 'supsub-cli' });
-    process.env.SUPSUB_API_KEY = 'env_key';
+    await writeConfig({
+      access_token: 'acc.token.jwt',
+      refresh_token: 'ref.token.jwt',
+      client_id: 'supsub-cli',
+    });
 
     const result = await resolveApiKey();
-    expect(result.key).toBe('env_key');
-    expect(result.source).toBe('env');
+    expect(result.refreshToken).toBe('ref.token.jwt');
+  });
+
+  // ─── API Key 通道已移除，以下两条守住不会被悄悄改回来 ───
+
+  test('老配置残留的 api_key 不再被当作凭证', async () => {
+    const { writeConfig } = await import('../../src/config/store.ts');
+    const { resolveApiKey } = await import('../../src/http/credentials.ts');
+
+    await writeConfig({ api_key: 'sk_live_xxx', client_id: 'supsub-cli' });
+
+    const result = await resolveApiKey();
+    expect(result.key).toBeUndefined();
+    expect(result.source).toBeUndefined();
+  });
+
+  test('api_key 与 bearer_token 共存时由 bearer_token 生效', async () => {
+    const { writeConfig } = await import('../../src/config/store.ts');
+    const { resolveApiKey } = await import('../../src/http/credentials.ts');
+
+    await writeConfig({
+      api_key: 'sk_live_xxx',
+      bearer_token: 'browser_token',
+      client_id: 'supsub-cli',
+    });
+
+    const result = await resolveApiKey();
+    expect(result.key).toBe('browser_token');
+    expect(result.source).toBe('session');
+  });
+
+  test('clearAuth 同时清除 bearer_token 与老配置里的 api_key', async () => {
+    const { writeConfig, readConfig, clearAuth } = await import('../../src/config/store.ts');
+
+    await writeConfig({
+      api_key: 'k_unit',
+      bearer_token: 't_unit',
+      client_id: 'c_unit',
+    });
+    await clearAuth();
+
+    const cfg = await readConfig();
+    expect(cfg.api_key).toBeUndefined();
+    expect(cfg.bearer_token).toBeUndefined();
+    expect(cfg.client_id).toBeUndefined();
   });
 
   test('无任何凭证时 source 为 undefined', async () => {

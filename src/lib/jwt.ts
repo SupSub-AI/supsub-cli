@@ -9,7 +9,7 @@
  *
  * 任何不合法输入（段数不对 / 非 base64 / 无 exp 字段）一律返回 undefined，
  * 调用方按「无法判断过期时间」处理，不要抛错——凭证不一定是 JWT
- * （api_key、浏览器粘贴的 bearer_token 都可能不是）。
+ * （浏览器粘贴的 bearer_token 就可能不是）。
  */
 export function getTokenExpiryMs(token: string): number | undefined {
   const parts = token.split('.');

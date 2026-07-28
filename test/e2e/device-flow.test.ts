@@ -31,7 +31,7 @@ import { e2eApiUrl } from '../_helpers/api-url.ts';
 // bun test 默认 cwd 为项目根目录
 const ENTRY = 'src/index.ts';
 
-const BEARER = process.env.SUPSUB_E2E_BEARER || process.env.SUPSUB_API_KEY;
+const BEARER = process.env.SUPSUB_E2E_BEARER;
 const SKIP = !BEARER;
 
 /** 轮询等待 fn 返回非空值；超时抛错。用于从持续累积的 stderr 里捞 userCode。 */
@@ -84,7 +84,6 @@ describe.skipIf(SKIP)('e2e/device-flow - 设备授权完整闭环', () => {
     env.SUPSUB_API_URL = apiUrl;
     env.SUPSUB_CONFIG_DIR = cfgDir;
     env.SUPSUB_NO_BROWSER = '1';
-    delete env.SUPSUB_API_KEY; // 走 device flow，而不是 --api-key 直登
 
     // 1. 启动 auth login（会持续轮询），捕获 stderr
     const child = spawn('bun', ['run', ENTRY, 'auth', 'login'], {

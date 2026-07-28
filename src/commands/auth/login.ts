@@ -33,28 +33,10 @@ export function registerAuthLogin(parent: Command): void {
     .command('login')
     .description('登录 SupSub')
     .action(async () => {
-      const globalOpts = (parent.parent?.opts() ?? {}) as {
-        apiKey?: string;
-        output?: string;
-      };
+      const globalOpts = (parent.parent?.opts() ?? {}) as { output?: string };
       const fmt = globalOpts.output;
 
-      // 如果全局 --api-key 已设置，直接写入配置，跳过 Device Flow
-      if (globalOpts.apiKey) {
-        await writeConfig({ api_key: globalOpts.apiKey, client_id: 'supsub-cli' });
-        const info = await fetchUserInfoSafely();
-        printLoginSuccess(info);
-        if (fmt === 'json') {
-          output(
-            { client_id: 'supsub-cli', email: info?.email, name: info?.name },
-            'json',
-            () => {},
-          );
-        }
-        return;
-      }
-
-      // Device Flow（设备授权）：成功后存储 access_token / refresh_token
+      // Device Flow（设备授权）是唯一登录入口：成功后存储 access_token / refresh_token
       const { access_token, refresh_token } = await runDeviceFlow();
       await writeConfig({ access_token, refresh_token, client_id: 'supsub-cli' });
       const info = await fetchUserInfoSafely();

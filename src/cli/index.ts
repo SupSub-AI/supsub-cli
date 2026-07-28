@@ -44,7 +44,6 @@ import { registerSubRemove } from '../commands/sub/remove.ts';
 import { registerUnread } from '../commands/unread.ts';
 // Self-update command
 import { registerUpdate } from '../commands/update.ts';
-import { setCliApiKey } from '../http/credentials.ts';
 import { setCliApiUrl } from '../lib/api-url.ts';
 import { dieWith, type ErrorEnvelope, isErrorEnvelope } from '../lib/errors.ts';
 import { checkSkillsDrift, formatDriftNotice } from '../lib/skills-check.ts';
@@ -98,13 +97,11 @@ export async function run(): Promise<void> {
     .version(pkg.version)
     // 全局选项
     .option('-o, --output <fmt>', '输出格式：table|json', 'table')
-    .option('--api-key <key>', 'API Key（优先级高于环境变量和配置文件）')
     .option('--api-url <url>', 'API 基地址（优先级高于 SUPSUB_API_URL 环境变量）');
 
-  // 把全局 --api-key / --api-url flag 注入解析器，让 request/api 层无需逐层透传
+  // 把全局 --api-url flag 注入解析器，让 request/api 层无需逐层透传
   program.hook('preAction', () => {
-    const opts = program.opts() as { apiKey?: string; apiUrl?: string };
-    setCliApiKey(opts.apiKey);
+    const opts = program.opts() as { apiUrl?: string };
     setCliApiUrl(opts.apiUrl);
   });
 

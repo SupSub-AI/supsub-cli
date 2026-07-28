@@ -48,7 +48,7 @@ export const SKILL_DESCRIPTIONS: Record<string, string> = {
 
 /**
  * 同步 runner：执行 `npx <args>` 并返回输出。抽成可注入接口，便于测试用 fake runner
- * 替换，不真的起子进程 / 连网（参考 http/credentials.ts 的 setCliApiKey 注入思路）。
+ * 替换，不真的起子进程 / 连网（参考 lib/api-url.ts 的 setCliApiUrl 注入思路）。
  */
 export type SyncRunner = (args: string[]) => Promise<{ stdout: string; stderr: string }>;
 

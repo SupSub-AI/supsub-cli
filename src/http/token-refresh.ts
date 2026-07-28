@@ -12,7 +12,7 @@ import { resolveApiKey } from './credentials.ts';
  * - `refreshed`   续期成功，新令牌已写回 config；重新 resolve 凭证后重试原请求
  * - `invalid`     refreshToken 已失效（400/401）；清除凭证，要求用户重新登录
  * - `unavailable` 网络 / 服务端抖动；本地令牌原样保留，**不要登出**，让用户稍后重试
- * - `skipped`     当前凭证来源不支持续期（flag / env / api_key / bearer_token）
+ * - `skipped`     当前凭证来源不支持续期（bearer_token）
  */
 export type RefreshOutcome = 'refreshed' | 'invalid' | 'unavailable' | 'skipped';
 
@@ -40,7 +40,7 @@ export async function refreshAccessToken(): Promise<RefreshOutcome> {
 
 async function doRefresh(): Promise<RefreshOutcome> {
   const { refreshToken } = await resolveApiKey();
-  // 没有 refresh_token → 当前来源不具备续期能力（api_key / env / flag / bearer）
+  // 没有 refresh_token → 当前来源不具备续期能力（bearer_token）
   if (!refreshToken) return 'skipped';
 
   try {

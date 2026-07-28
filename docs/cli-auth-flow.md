@@ -101,22 +101,17 @@ stateDiagram-v2
 
 ```mermaid
 flowchart TD
-    A{--api-key flag?} -- 是 --> A1["key=flag 值<br/>source=flag"]
-    A -- 否 --> B{env SUPSUB_API_KEY?}
-    B -- 是 --> B1["source=env"]
-    B -- 否 --> C{config.access_token?}
-    C -- 是 --> C1["source=config<br/>（设备流登录写入）"]
-    C -- 否 --> D{config.api_key?}
-    D -- 是 --> D1["source=config<br/>（--api-key 登录写入）"]
-    D -- 否 --> E{config.bearer_token?}
+    C{config.access_token?} -- 是 --> C1["source=config<br/>（设备流登录写入，带 refresh_token）"]
+    C -- 否 --> E{config.bearer_token?}
     E -- 是 --> E1["source=session<br/>（浏览器手动粘贴）"]
     E -- 否 --> F["未登录"]
 ```
 
+设备授权是唯一登录入口，凭证解析因此只有两级——没有 flag / env / API Key 通道。
+
 - 设备流登录把令牌写入 `config.access_token` / `config.refresh_token`（见 `src/config/store.ts` 的 `Config`）。
-- `--api-key` 快捷登录跳过设备流，直接写 `config.api_key`。
-- `resolveApiKey()` **只在 key 取自 `config.access_token` 时**返回 `refreshToken`——其余来源（flag / env / api_key / bearer_token）没有续期通道，也不该被自动续期。
-- 401 且续不成 → `client.ts` 调 `clearAuth()` 清除 `api_key`/`access_token`/`refresh_token`/`bearer_token`。详见下一节。
+- `resolveApiKey()` **只在 key 取自 `config.access_token` 时**返回 `refreshToken`——`bearer_token` 是浏览器手动粘贴的临时凭证，没有续期通道，也不该被自动续期。
+- 401 且续不成 → `client.ts` 调 `clearAuth()` 清除 `access_token`/`refresh_token`/`bearer_token`（连带抹掉老配置里可能残留的 `api_key`）。详见下一节。
 
 ---
 
@@ -153,7 +148,7 @@ flowchart TD
 | `refreshed` | 2xx 且带回 `accessToken`（实测返回 **201**） | 新令牌写回 config，重试原请求 |
 | `invalid` | 400 / 401（实测：`{"code":"Unauthorized","message":"无效的令牌"}`） | `clearAuth()` + `UNAUTHORIZED`，要求重新登录 |
 | `unavailable` | 网络异常 / 5xx / 响应缺 `accessToken` | **保留凭证**，抛 `NETWORK_ERROR` 让用户稍后重试 |
-| `skipped` | 当前来源没有 `refresh_token`（flag/env/api_key/bearer） | 维持旧行为：401 直接 `clearAuth()` |
+| `skipped` | 当前来源没有 `refresh_token`（即 `bearer_token`） | 维持旧行为：401 直接 `clearAuth()` |
 
 设计要点：
 
@@ -161,23 +156,20 @@ flowchart TD
 - **只重试一次**：续期成功后重试仍 401 → 直接登出，不进重试循环。
 - **并发去重**：`refreshAccessToken()` 用一个 in-flight Promise 做单飞，省掉重复往返、避免两次 `writeConfig` 相互覆盖。（实测该后端换新令牌后旧 `refreshToken` 仍可用，所以并发换两次不会把人换登出——但没必要多打一发。）
 - **重试必须重新解析凭证**：`client.ts` 里的 `send()` 每次都重新 `resolveApiKey()`，否则重试仍会带上旧的 `access_token`。
-- **本地过期判断不验签**：`src/lib/jwt.ts` 只 base64url 解 `exp`。解析不出（`api_key`、浏览器粘贴的 `bearer_token` 等非 JWT 凭证）就返回「不知道」，交给 401 兜底；主动续期遇上 `unavailable` 也照常发老令牌出去——本地时钟可能有偏差，老令牌说不定还能用。
+- **本地过期判断不验签**：`src/lib/jwt.ts` 只 base64url 解 `exp`。解析不出（浏览器粘贴的 `bearer_token` 这类非 JWT 凭证）就返回「不知道」，交给 401 兜底；主动续期遇上 `unavailable` 也照常发老令牌出去——本地时钟可能有偏差，老令牌说不定还能用。
 
 ---
 
-## 6. 两条登录路径
+## 6. 登录路径（唯一：设备授权）
 
 ```mermaid
 flowchart LR
-    L["supsub auth login"] --> Q{带 --api-key?}
-    Q -- 是 --> K["writeConfig(api_key, client_id)<br/>跳过设备流"]
-    Q -- 否 --> DF["runDeviceFlow()<br/>设备授权"]
+    L["supsub auth login"] --> DF["runDeviceFlow()<br/>设备授权"]
     DF --> S["writeConfig(access_token,<br/>refresh_token, client_id)"]
-    K --> OK([✅ 登录成功])
-    S --> OK
+    S --> OK([✅ 登录成功])
 ```
 
-登录后 `supsub auth status` → `GET /api/user/info`（携带 Bearer）展示账号信息。
+设备授权是 `supsub auth login` 的唯一入口——没有 `--api-key` 之类跳过设备流的旁路。登录后 `supsub auth status` → `GET /api/user/info`（携带 Bearer）展示账号信息。
 
 ---
 
@@ -202,6 +194,5 @@ flowchart LR
 | 变量 | 作用 | 默认 |
 |---|---|---|
 | `SUPSUB_API_URL` | 覆盖 API 基址（等价于 `--api-url` flag，但 flag 优先级更高） | `https://supsub.net` |
-| `SUPSUB_API_KEY` | 注入 Bearer（source=env） | 无 |
 | `SUPSUB_NO_BROWSER` | 真值时 `auth login` 不自动打开浏览器（e2e / 无头环境） | 未设 |
 | `SUPSUB_CONFIG_DIR` | 覆盖配置目录（测试隔离用） | `~/.supsub` |

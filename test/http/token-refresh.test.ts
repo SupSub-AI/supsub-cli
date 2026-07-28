@@ -15,7 +15,7 @@ const CONFIG_FILE = configFile();
 type Cfg = {
   access_token?: string;
   refresh_token?: string;
-  api_key?: string;
+  bearer_token?: string;
   client_id?: string;
 };
 
@@ -31,20 +31,15 @@ async function readRawConfig(): Promise<Cfg> {
 describe('http/token-refresh', () => {
   let originalFetch: typeof globalThis.fetch;
   let originalApiUrl: string | undefined;
-  let originalEnvKey: string | undefined;
   /** 记录续期端点被打了几次，用来验证并发去重 / 提前跳过 */
   let refreshCalls: number;
 
   beforeEach(async () => {
     originalFetch = globalThis.fetch;
     originalApiUrl = process.env.SUPSUB_API_URL;
-    originalEnvKey = process.env.SUPSUB_API_KEY;
     process.env.SUPSUB_API_URL = 'http://fake-host';
-    delete process.env.SUPSUB_API_KEY;
     refreshCalls = 0;
 
-    const { setCliApiKey } = await import('../../src/http/credentials.ts');
-    setCliApiKey(undefined);
     const { __resetRefreshStateForTest } = await import('../../src/http/token-refresh.ts');
     __resetRefreshStateForTest();
   });
@@ -53,8 +48,6 @@ describe('http/token-refresh', () => {
     globalThis.fetch = originalFetch;
     if (originalApiUrl === undefined) delete process.env.SUPSUB_API_URL;
     else process.env.SUPSUB_API_URL = originalApiUrl;
-    if (originalEnvKey === undefined) delete process.env.SUPSUB_API_KEY;
-    else process.env.SUPSUB_API_KEY = originalEnvKey;
 
     const { __resetRefreshStateForTest } = await import('../../src/http/token-refresh.ts');
     __resetRefreshStateForTest();
@@ -205,8 +198,8 @@ describe('http/token-refresh', () => {
     expect(cfg.access_token).toBe('old-access');
   });
 
-  test('api_key 来源没有续期通道：返回 skipped 且不发请求', async () => {
-    await writeRawConfig({ api_key: 'sk_live_xxx', client_id: 'supsub-cli' });
+  test('bearer_token 来源没有续期通道：返回 skipped 且不发请求', async () => {
+    await writeRawConfig({ bearer_token: 'pasted_from_devtools', client_id: 'supsub-cli' });
     mockRefreshEndpoint(() => new Response('{}', { status: 200 }));
 
     const { refreshAccessToken } = await import('../../src/http/token-refresh.ts');
@@ -256,19 +249,14 @@ describe('http/token-refresh', () => {
 describe('http/token-refresh - refreshIfExpiringSoon', () => {
   let originalFetch: typeof globalThis.fetch;
   let originalApiUrl: string | undefined;
-  let originalEnvKey: string | undefined;
   let refreshCalls: number;
 
   beforeEach(async () => {
     originalFetch = globalThis.fetch;
     originalApiUrl = process.env.SUPSUB_API_URL;
-    originalEnvKey = process.env.SUPSUB_API_KEY;
     process.env.SUPSUB_API_URL = 'http://fake-host';
-    delete process.env.SUPSUB_API_KEY;
     refreshCalls = 0;
 
-    const { setCliApiKey } = await import('../../src/http/credentials.ts');
-    setCliApiKey(undefined);
     const { __resetRefreshStateForTest } = await import('../../src/http/token-refresh.ts');
     __resetRefreshStateForTest();
 
@@ -285,8 +273,6 @@ describe('http/token-refresh - refreshIfExpiringSoon', () => {
     globalThis.fetch = originalFetch;
     if (originalApiUrl === undefined) delete process.env.SUPSUB_API_URL;
     else process.env.SUPSUB_API_URL = originalApiUrl;
-    if (originalEnvKey === undefined) delete process.env.SUPSUB_API_KEY;
-    else process.env.SUPSUB_API_KEY = originalEnvKey;
 
     const { __resetRefreshStateForTest } = await import('../../src/http/token-refresh.ts');
     __resetRefreshStateForTest();
@@ -315,8 +301,10 @@ describe('http/token-refresh - refreshIfExpiringSoon', () => {
     expect(cfg.refresh_token).toBe('new-refresh');
   });
 
-  test('凭证不是 JWT（api_key）时不做任何猜测', async () => {
-    await writeRawConfig({ api_key: 'sk_live_xxx' });
+  // 有 refresh_token（续期通道在），但 access_token 解不出 exp —— 走的是 jwt 解析这一关，
+  // 而不是「来源不支持续期」那一关。
+  test('凭证不是 JWT 时不做任何猜测', async () => {
+    await writeRawConfig({ access_token: 'not-a-jwt', refresh_token: 'r_unit' });
 
     const { refreshIfExpiringSoon } = await import('../../src/http/token-refresh.ts');
     expect(await refreshIfExpiringSoon()).toBe('skipped');

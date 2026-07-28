@@ -4,7 +4,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-const BEARER = process.env.SUPSUB_E2E_BEARER || process.env.SUPSUB_API_KEY;
+const BEARER = process.env.SUPSUB_E2E_BEARER;
 const SKIP = !BEARER;
 
 // bun test 默认 cwd 为项目根目录
@@ -15,8 +15,12 @@ type CliResult = { stdout: string; stderr: string; code: number };
 /**
  * 用子进程运行 CLI，返回 stdout/stderr/exit code。
  * 关键点：
- *   - HOME 指到一个空临时目录，强制 readConfig 拿空对象，
- *     避免本机现有 ~/.supsub/config.json 抢 source=config 优先级
+ *   - HOME + SUPSUB_CONFIG_DIR 都指到 tmpHome 下的隔离目录，强制 CLI 只从
+ *     这里读凭证，既不污染本机 ~/.supsub，也不继承全局 preload 的配置目录。
+ *   - 登录唯一入口是「config.json 里的 access_token」：withAuth=true 时把真实
+ *     BEARER 写进 config.json（等价于旧 --api-key 直登）；否则写空对象模拟未登录。
+ *     **只写 access_token、不写 refresh_token** —— 没有续期通道，保持凭证一次性语义。
+ *   - token 选项可写入任意（含伪造）access_token，用于 401 路径。
  *   - 不强制覆盖 SUPSUB_API_URL：基址由 CLI 子进程自行解析
  *     （SUPSUB_API_URL > DEFAULT_API_URL）。跑测试时用 SUPSUB_API_URL
  *     指向目标环境，并提供同环境的 SUPSUB_E2E_BEARER。
@@ -25,30 +29,29 @@ type CliResult = { stdout: string; stderr: string; code: number };
 async function runCli(
   args: string[],
   opts: {
+    /** 写入真实 BEARER 作为 access_token（等价于旧的 --api-key 直登） */
     withAuth?: boolean;
+    /** 写入指定 access_token（优先于 withAuth，用于伪造 token 的 401 路径） */
+    token?: string;
     tmpHome?: string;
-    /**
-     * 通过 SUPSUB_API_KEY 环境变量注入 key（用于测试 source=env 路径）。
-     * 与 withAuth (=>--api-key flag) 不互斥，但同时设置时 flag 优先。
-     */
-    apiKeyEnv?: string;
-    /** 额外的环境变量覆盖（最高优先级） */
-    extraEnv?: Record<string, string>;
   } = {},
 ): Promise<CliResult> {
   const env: Record<string, string> = {
     ...(process.env as Record<string, string>),
   };
-  if (opts.tmpHome) env.HOME = opts.tmpHome;
-  // 默认先清掉本机 SUPSUB_API_KEY，避免抢 source=env 优先级
-  delete env.SUPSUB_API_KEY;
-  // 测试需要走 env source 时再显式注入
-  if (opts.apiKeyEnv !== undefined) env.SUPSUB_API_KEY = opts.apiKeyEnv;
-  if (opts.extraEnv) Object.assign(env, opts.extraEnv);
 
-  const finalArgs = opts.withAuth
-    ? ['run', ENTRY, '--api-key', BEARER!, ...args]
-    : ['run', ENTRY, ...args];
+  if (opts.tmpHome) {
+    env.HOME = opts.tmpHome;
+    // 用 tmpHome 下的 .supsub 作为隔离配置目录，覆盖继承来的全局 preload 目录
+    const configDir = path.join(opts.tmpHome, '.supsub');
+    env.SUPSUB_CONFIG_DIR = configDir;
+    await fs.mkdir(configDir, { recursive: true });
+    const token = opts.token ?? (opts.withAuth ? BEARER : undefined);
+    const cfg = token !== undefined ? { access_token: token, client_id: 'supsub-cli' } : {};
+    await fs.writeFile(path.join(configDir, 'config.json'), JSON.stringify(cfg));
+  }
+
+  const finalArgs = ['run', ENTRY, ...args];
 
   return await new Promise<CliResult>((resolve, reject) => {
     const child = spawn('bun', finalArgs, { env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -93,7 +96,7 @@ describe.skipIf(SKIP)('e2e/prod-cli - 通过子进程驱动 CLI 打测试环境'
   // ─── 鉴权相关 ───────────────────────────────────────────────
 
   test('没登录就查看登录状态：提示去登录、退出码 2', async () => {
-    const r = await runCli(['auth', 'status'], { tmpHome }); // 无 --api-key
+    const r = await runCli(['auth', 'status'], { tmpHome }); // 未登录（config 为空）
     expect(r.code).toBe(2);
     expect(r.stderr).toMatch(/auth login|登录/);
   });
@@ -106,7 +109,7 @@ describe.skipIf(SKIP)('e2e/prod-cli - 通过子进程驱动 CLI 打测试环境'
     expect(body.error.code).toBe('UNAUTHORIZED');
   });
 
-  test('用 --api-key 临时登录：能拿到 email、api_key 已脱敏、source=flag', async () => {
+  test('登录后查看状态（JSON）：拿到 email、source=config、api_key 已脱敏', async () => {
     const r = await runCli(['--output', 'json', 'auth', 'status'], {
       tmpHome,
       withAuth: true,
@@ -115,8 +118,8 @@ describe.skipIf(SKIP)('e2e/prod-cli - 通过子进程驱动 CLI 打测试环境'
     const body = JSON.parse(r.stdout);
     expect(body.success).toBe(true);
     expect(body.data.email).toContain('@');
-    // --api-key flag 命中 → source=flag
-    expect(body.data.api_key_source).toBe('flag');
+    // access_token 来自 config.json → source=config
+    expect(body.data.api_key_source).toBe('config');
     // api_key 必须脱敏（不回显原 token）
     expect(body.data.api_key).not.toBe(BEARER);
     expect(body.data.api_key).toContain('***');
@@ -195,11 +198,11 @@ describe.skipIf(SKIP)('e2e/prod-cli - 通过子进程驱动 CLI 打测试环境'
 
   // ─── 鉴权失败路径 ───────────────────────────────────────────
 
-  test('用伪造的 --api-key 登录：服务端 401 → 退出码 2', async () => {
-    const r = await runCli(
-      ['--api-key', 'sk_invalid_e2e_token', '--output', 'json', 'auth', 'status'],
-      { tmpHome },
-    );
+  test('config 里是伪造的 access_token：服务端 401 → 退出码 2', async () => {
+    const r = await runCli(['--output', 'json', 'auth', 'status'], {
+      tmpHome,
+      token: 'sk_invalid_e2e_token',
+    });
     expect(r.code).toBe(2);
     const body = JSON.parse(r.stdout);
     expect(body.error.code).toBe('UNAUTHORIZED');
@@ -400,27 +403,6 @@ describe.skipIf(SKIP)('e2e/prod-cli - 通过子进程驱动 CLI 打测试环境'
     expect(r.code).toBe(2);
     const body = JSON.parse(r.stdout);
     expect(body.error.code).toBe('UNAUTHORIZED');
-  });
-
-  // ─── 鉴权来源（source 优先级） ───────────────────────────────
-
-  test('用环境变量 SUPSUB_API_KEY 登录：source=env', async () => {
-    const r = await runCli(['--output', 'json', 'auth', 'status'], { tmpHome, apiKeyEnv: BEARER! });
-    expect(r.code).toBe(0);
-    const body = JSON.parse(r.stdout);
-    expect(body.success).toBe(true);
-    expect(body.data.api_key_source).toBe('env');
-  });
-
-  test('命令行 --api-key 和环境变量都设了：命令行优先（source=flag）', async () => {
-    const r = await runCli(['--api-key', BEARER!, '--output', 'json', 'auth', 'status'], {
-      tmpHome,
-      apiKeyEnv: 'sk_should_be_overridden',
-    });
-    expect(r.code).toBe(0);
-    const body = JSON.parse(r.stdout);
-    expect(body.success).toBe(true);
-    expect(body.data.api_key_source).toBe('flag');
   });
 
   // ─── 添加订阅源：客户端参数校验（不发请求） ─────────────────

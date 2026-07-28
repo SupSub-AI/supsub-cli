@@ -5,8 +5,8 @@ import { Command } from 'commander';
 import { pollUntilSettled } from '../../../src/commands/deepread/_shared.ts';
 import { registerDeepReadGet } from '../../../src/commands/deepread/get.ts';
 import { registerDeepReadRun } from '../../../src/commands/deepread/run.ts';
-import { setCliApiKey } from '../../../src/http/credentials.ts';
 import { deepReadRootDir } from '../../../src/lib/deep-read-store.ts';
+import { setTestCredential } from '../../_helpers/credential.ts';
 
 const DONE_BODY = {
   status: 'done',
@@ -47,11 +47,11 @@ describe('commands/deepread - run / get', () => {
   let calls: Call[];
   let getStatus: 'none' | 'pending' | 'done' | 'failed';
 
-  beforeEach(() => {
+  beforeEach(async () => {
     originalFetch = globalThis.fetch;
     originalApiUrl = process.env.SUPSUB_API_URL;
     process.env.SUPSUB_API_URL = 'http://fake-host';
-    setCliApiKey('sk_deepread_test');
+    await setTestCredential('sk_deepread_test');
     stdoutOutput = '';
     calls = [];
     getStatus = 'none';
@@ -84,7 +84,7 @@ describe('commands/deepread - run / get', () => {
   afterEach(async () => {
     process.stdout.write = originalStdout;
     globalThis.fetch = originalFetch;
-    setCliApiKey(undefined);
+    await setTestCredential(undefined);
     if (originalApiUrl === undefined) delete process.env.SUPSUB_API_URL;
     else process.env.SUPSUB_API_URL = originalApiUrl;
     await fs.rm(deepReadRootDir(), { recursive: true, force: true });

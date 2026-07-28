@@ -40,20 +40,20 @@ describe('config/store - readConfig / writeConfig / clearAuth', () => {
   test('1.2.a writeConfig 写入后 readConfig 可取回', async () => {
     const { writeConfig, readConfig } = await import('../../src/config/store.ts');
 
-    await writeConfig({ api_key: 'sk_test_unit' });
+    await writeConfig({ access_token: 'sk_test_unit' });
     const config = await readConfig();
-    expect(config.api_key).toBe('sk_test_unit');
+    expect(config.access_token).toBe('sk_test_unit');
   });
 
   test('1.2.b writeConfig patch 合并保留旧字段', async () => {
     const { writeConfig, readConfig } = await import('../../src/config/store.ts');
 
-    // 先写 api_key
-    await writeConfig({ api_key: 'k1_unit' });
+    // 先写 access_token
+    await writeConfig({ access_token: 'k1_unit' });
     // 再 patch client_id
     await writeConfig({ client_id: 'c1_unit' });
     const config = await readConfig();
-    expect(config.api_key).toBe('k1_unit');
+    expect(config.access_token).toBe('k1_unit');
     expect(config.client_id).toBe('c1_unit');
   });
 

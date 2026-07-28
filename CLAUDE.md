@@ -73,7 +73,9 @@ The sections below describe how to *develop* this CLI, not how to use it. If you
 - `pnpm dev -- <args>` — run the CLI from source (`bun run src/index.ts`). Use this for local CLI testing, not the compiled binary.
 - `pnpm build` — `bun build --compile` to a single executable at `dist/supsub`.
 - `pnpm typecheck` — `tsc --noEmit`. Run after non-trivial type changes; build does not typecheck.
-- `pnpm test` — `bun test` runs the **entire** suite, including `test/e2e/` which hits the live `https://supsub.net` API and requires real credentials. To skip e2e, target dirs explicitly: `bun test test/commands test/config test/http`.
+- `pnpm test` — `bun test` runs the whole suite, but **`test/e2e/` auto-skips** unless you supply credentials: each e2e file is `describe.skipIf(!process.env.SUPSUB_E2E_BEARER)`. So the default run is offline-safe and never touches the live API.
+  - To actually run e2e against `https://supsub.net`: `SUPSUB_E2E_BEARER="$(jq -r .access_token ~/.supsub/config.json)" bun test test/e2e`. Write-path tests need `SUPSUB_E2E_MUTATE=1` on top (they create/delete real groups and subscriptions), and `mp search` needs `SUPSUB_E2E_MP_SEARCH=1`.
+  - ⚠️ Because they skip silently, e2e assertions rot undetected — a stale `articleId` assertion survived the `articleId`→`contentId` migration for months. **Run them for real after any API-contract change**, don't trust a green `pnpm test`.
 
 ## TypeScript config to respect
 
@@ -86,9 +88,10 @@ The sections below describe how to *develop* this CLI, not how to use it. If you
 These conventions are enforced by the existing structure — new code must follow them or the abstractions break:
 
 - **All HTTP goes through `src/http/client.ts`'s `request()`.** It handles auth header injection, error envelope normalization, and exit-code mapping. Do not call `fetch` directly from commands or `src/api/`.
-- **Credential resolution lives in `src/http/credentials.ts`** with strict precedence: `--api-key` flag > `SUPSUB_API_KEY` env > `api_key` in config > `bearer_token` (transient browser session). A 401 response clears stored auth.
+- **Credential resolution lives in `src/http/credentials.ts`** with strict precedence: `access_token` in config (OAuth device-flow token, carries `refresh_token` so it can auto-refresh) > `bearer_token` in config (transient browser session pasted from DevTools, no refresh path). Login is device-flow only — there is no `--api-key` flag and no `SUPSUB_API_KEY` env. A 401 response clears stored auth.
 - **All command output goes through `src/ui/output.ts`'s `output()`.** It dispatches between JSON mode (`-o json`, errors to stdout for jq piping) and table mode (errors to stderr). Never `console.log` results directly.
-- **Errors are `ErrorEnvelope` objects** (`src/lib/errors.ts`) with semantic exit codes from `src/lib/exit-code.ts`: `0` OK, `2` UNAUTHORIZED, `3` PLAN_EXPIRED, `10` NETWORK, `11` SERVER, `64` INVALID_ARGS. Callers may rely on these — do not change the mapping casually.
+- **Errors are `ErrorEnvelope` objects** (`src/lib/errors.ts`) with semantic exit codes from `src/lib/exit-code.ts`: `0` OK, `1` BUSINESS, `2` UNAUTHORIZED, `3` PLAN_EXPIRED, `10` NETWORK, `11` SERVER, `64` INVALID_ARGS. Callers may rely on these — do not change the mapping casually.
+  - `1` vs `11` is decided by HTTP status, not by error kind: `errors.ts` maps `status >= 500 → SERVER (11)`, everything else 4xx → `BUSINESS (1)`. So «分组不存在» / «未订阅» / «重复订阅» all exit `1`. Keep the skills' exit-code lists in sync — they are the agent-facing contract.
 - **Commands follow the `register<Name>(parent: Command)` pattern** — see existing files in `src/commands/` for the shape.
 
 ## API / Web base URL

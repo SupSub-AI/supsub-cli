@@ -19,7 +19,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-const BEARER = process.env.SUPSUB_E2E_BEARER || process.env.SUPSUB_API_KEY;
+const BEARER = process.env.SUPSUB_E2E_BEARER;
 const SKIP = !BEARER;
 const SKIP_SPEND = SKIP || process.env.SUPSUB_E2E_DEEPREAD !== '1';
 
@@ -32,12 +32,18 @@ async function runCli(
   opts: { withAuth?: boolean; configDir?: string } = {},
 ): Promise<CliResult> {
   const env: Record<string, string> = { ...(process.env as Record<string, string>) };
-  delete env.SUPSUB_API_KEY;
-  if (opts.configDir) env.SUPSUB_CONFIG_DIR = opts.configDir;
+  if (opts.configDir) {
+    env.SUPSUB_CONFIG_DIR = opts.configDir;
+    // withAuth 时把真实 BEARER 写进 config.json 的 access_token（只写 access_token、
+    // 不写 refresh_token，保持凭证一次性、不触发续期）；否则写空对象模拟未登录。
+    // 每次 spawn 前都重写，与调用顺序无关；deepread 的本地缓存在同目录的
+    // deepread/ 子目录下，不受影响。
+    await fs.mkdir(opts.configDir, { recursive: true });
+    const cfg = opts.withAuth ? { access_token: BEARER, client_id: 'supsub-cli' } : {};
+    await fs.writeFile(path.join(opts.configDir, 'config.json'), JSON.stringify(cfg));
+  }
 
-  const finalArgs = opts.withAuth
-    ? ['run', ENTRY, '--api-key', BEARER!, ...args]
-    : ['run', ENTRY, ...args];
+  const finalArgs = ['run', ENTRY, ...args];
 
   return await new Promise<CliResult>((resolve, reject) => {
     const child = spawn('bun', finalArgs, { env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -328,7 +334,7 @@ describe.skipIf(SKIP_SPEND)('e2e/prod-deepread - 完整精读闭环（消耗额�
     expect(s2.shareCode).toBe(s.shareCode);
     expect(s2.reused).toBe(true);
 
-    // show 不带 --api-key：分享页是公开的
+    // show 不带任何凭证：分享页是公开的
     const shown = await runCli(
       ['--output', 'json', 'deepread', 'show', '--share-code', s.shareCode],
       {

@@ -4,16 +4,20 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 type Config = {
-  /** 设备授权得到的访问令牌（accessToken）。优先级高于 api_key。 */
+  /** 设备授权得到的访问令牌（accessToken），CLI 的主凭证。 */
   access_token?: string;
   /** 设备授权得到的刷新令牌（refreshToken），用于后续续期。 */
   refresh_token?: string;
+  /**
+   * 历史遗留字段：旧版本的 `--api-key` 登录会写入这里。
+   * 现已不再读取、也不再写入，保留声明只是为了让 clearAuth 能清掉老配置里的残留。
+   */
   api_key?: string;
   client_id?: string;
   /**
    * 临时鉴权来源：用户从浏览器 DevTools 复制的
    * `Authorization: Bearer <token>` 中的 token，手动写入。
-   * 仅在 access_token / api_key 缺失时回落使用，401 时与其一同被清除。
+   * 仅在 access_token 缺失时回落使用，401 时与其一同被清除。
    */
   bearer_token?: string;
 };
@@ -85,7 +89,8 @@ export async function writeConfig(patch: Partial<Config>): Promise<void> {
 }
 
 /**
- * 清除认证信息（删除 access_token、refresh_token、api_key、client_id、bearer_token）
+ * 清除认证信息（删除 access_token、refresh_token、client_id、bearer_token，
+ * 以及老配置里可能残留的 api_key）
  */
 export async function clearAuth(): Promise<void> {
   const configDir = getConfigDir();

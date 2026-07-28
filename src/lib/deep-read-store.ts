@@ -58,7 +58,7 @@ export type DeepReadEntryBrief = Omit<DeepReadEntry, 'content'> & {
  * 当前账号对应的缓存子目录名。
  *
  * 走 resolveApiKey() 而不是直接读 config，是为了跟 HTTP 层用同一套凭证优先级
- * （--api-key flag > env > config），否则临时用 `--api-key` 切账号时会读错目录。
+ * （access_token > bearer_token），否则换凭证时会读错目录。
  * JWT 能解出用户 id 就用 id，否则退化为凭证哈希；完全没有凭证时用 anonymous。
  */
 export async function currentUserKey(): Promise<string> {

@@ -42,10 +42,9 @@ function runCli(args: string[], configDir: string, apiUrl: string): Promise<RunR
     const child = spawn('bun', ['run', ENTRY, ...args], {
       env: {
         ...process.env,
+        // 独立 SUPSUB_CONFIG_DIR：凭证只可能来自这里的 config.json
         SUPSUB_CONFIG_DIR: configDir,
         SUPSUB_API_URL: apiUrl,
-        // 保证凭证只可能来自 config，避免本机 env 干扰
-        SUPSUB_API_KEY: '',
         SUPSUB_NO_BROWSER: '1',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
