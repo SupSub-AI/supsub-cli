@@ -243,6 +243,33 @@ export function previousInstalledVersion(): string | null {
   return versions[1] ?? null;
 }
 
+/**
+ * 回滚计划：把「能否回滚」拆成三种互斥情形，让命令层各自给准确文案 / 错误码。
+ * 抽成纯函数便于单测——尤其是「有更新版本、但当前已是最旧、无更旧可退」这个之前
+ * 与「只有一个版本」混在一起、导致文案误导的分支。
+ * - `ok`：存在更旧版本，可回滚到 target。
+ * - `only-one`：本地仅有一个版本，压根没有历史版本。
+ * - `at-oldest`：本地有多个版本，但当前已是最旧，没有更旧的可退（更新的版本还留存着）。
+ */
+export type RollbackPlan =
+  | { kind: 'ok'; target: string; current: string | null; installed: string[] }
+  | { kind: 'only-one'; current: string | null; installed: string[] }
+  | { kind: 'at-oldest'; current: string; installed: string[] };
+
+export function planRollback(): RollbackPlan {
+  const installed = listInstalledVersions(); // 从新到旧
+  const linked = readLinkedVersion();
+  const target = previousInstalledVersion();
+  if (target) return { kind: 'ok', target, current: linked, installed };
+  if (installed.length <= 1) {
+    return { kind: 'only-one', current: linked ?? installed[0] ?? null, installed };
+  }
+  // 有 ≥2 个版本却取不到更旧版本 → 当前 symlink 指的就是最旧那个。
+  // 此时 linked 必非空（无 symlink 时 previousInstalledVersion 会返回第二新的、不会走到这里），
+  // 兜底用降序列表末位（最旧）以满足类型。
+  return { kind: 'at-oldest', current: linked ?? installed[installed.length - 1] ?? '', installed };
+}
+
 /** binDir 是否已在 PATH 中（用于安装后提示用户是否需要手动加 PATH） */
 export function isBinDirOnPath(binDir: string = getBinDir()): boolean {
   const pathEnv = process.env.PATH ?? '';

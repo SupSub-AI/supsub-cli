@@ -6,7 +6,7 @@ import { isErrorEnvelope } from '../lib/errors.ts';
 import {
   detectInstallMethod,
   installNativeVersion,
-  previousInstalledVersion,
+  planRollback,
   pruneVersions,
   switchToVersion,
 } from '../lib/install-layout.ts';
@@ -66,6 +66,12 @@ function printSkillsHint(outcome: SkillsOutcome): void {
 /**
  * 回滚：把 native 安装的 symlink 重指到上一个留存版本（不重新下载，symlink 重指即可）。
  * 仅 native 安装支持——npm 安装没有版本并存，只能 `npm i -g @supsub/cli@<version>`。
+ *
+ * 「不可回滚」拆成两种如实文案（旧实现把它们混成「本地仅保留了当前版本」，在「明明留存着
+ * 多个版本、只是当前已是最旧」时是**事实错误**，会让用户误以为版本目录被误删去查 prune）：
+ * - `ROLLBACK_NO_HISTORY`：本地确实只有一个版本；
+ * - `ROLLBACK_AT_OLDEST`：本地有多个版本，但当前已是最旧、没有更旧的可退。
+ * 两种错误的 `data` 都带上留存版本列表与当前版本，JSON 调用方可据 `code`/`data` 区分。
  */
 async function handleRollback(fmt: string | undefined): Promise<void> {
   const method = detectInstallMethod();
@@ -77,18 +83,35 @@ async function handleRollback(fmt: string | undefined): Promise<void> {
       status: 0,
     } satisfies ErrorEnvelope;
   }
-  const prev = previousInstalledVersion();
-  if (!prev) {
+
+  const plan = planRollback();
+  const list = (vs: string[]): string => vs.map((v) => `v${v}`).join(', ');
+
+  if (plan.kind === 'only-one') {
     throw {
-      code: 'UPDATE_FAILED',
-      message: '没有可回滚的历史版本（本地仅保留了当前版本）',
+      code: 'ROLLBACK_NO_HISTORY',
+      message: `本地只有当前版本${plan.current ? ` v${plan.current}` : ''}，没有可回滚的历史版本`,
       status: 0,
+      data: { current: plan.current, installed: plan.installed },
     } satisfies ErrorEnvelope;
   }
-  switchToVersion(prev);
-  output({ rolledBack: true, version: prev }, fmt, () => {
-    process.stdout.write(`✅ 已回滚到 v${prev}（symlink 已重指，下次启动生效）\n`);
-  });
+  if (plan.kind === 'at-oldest') {
+    throw {
+      code: 'ROLLBACK_AT_OLDEST',
+      message: `当前 v${plan.current} 已是本地最旧的留存版本，没有更旧的版本可回滚（本地留存：${list(plan.installed)}）`,
+      status: 0,
+      data: { current: plan.current, installed: plan.installed },
+    } satisfies ErrorEnvelope;
+  }
+
+  switchToVersion(plan.target);
+  output(
+    { rolledBack: true, version: plan.target, from: plan.current, installed: plan.installed },
+    fmt,
+    () => {
+      process.stdout.write(`✅ 已回滚到 v${plan.target}（symlink 已重指，下次启动生效）\n`);
+    },
+  );
 }
 
 export function registerUpdate(program: Command): void {

@@ -9,6 +9,7 @@ import {
   detectInstallMethod,
   isBinDirOnPath,
   listInstalledVersions,
+  planRollback,
   previousInstalledVersion,
   pruneVersions,
   readLinkedVersion,
@@ -147,6 +148,47 @@ describe('previousInstalledVersion', () => {
     makeVersion('0.4.0');
     makeVersion('0.5.0');
     expect(previousInstalledVersion()).toBe('0.4.0');
+  });
+});
+
+describe('planRollback', () => {
+  test('存在更旧版本 → ok，target 是更旧的一版', () => {
+    makeVersion('0.3.0');
+    makeVersion('0.4.0');
+    makeVersion('0.5.0');
+    switchToVersion('0.5.0');
+    const plan = planRollback();
+    expect(plan.kind).toBe('ok');
+    if (plan.kind === 'ok') {
+      expect(plan.target).toBe('0.4.0');
+      expect(plan.current).toBe('0.5.0');
+      expect(plan.installed).toEqual(['0.5.0', '0.4.0', '0.3.0']);
+    }
+  });
+
+  test('本地只有一个版本 → only-one（不谎称有历史版本）', () => {
+    makeVersion('0.5.0');
+    switchToVersion('0.5.0');
+    const plan = planRollback();
+    expect(plan.kind).toBe('only-one');
+    if (plan.kind === 'only-one') {
+      expect(plan.current).toBe('0.5.0');
+      expect(plan.installed).toEqual(['0.5.0']);
+    }
+  });
+
+  test('有多个版本但当前已是最旧 → at-oldest（之前被误并入 only-one 的分支）', () => {
+    makeVersion('0.3.0');
+    makeVersion('0.4.0');
+    makeVersion('0.5.0');
+    switchToVersion('0.3.0'); // 指向最旧
+    const plan = planRollback();
+    expect(plan.kind).toBe('at-oldest');
+    if (plan.kind === 'at-oldest') {
+      expect(plan.current).toBe('0.3.0');
+      // 留存列表如实带出更新的版本，供用户自查（不会以为被误删）
+      expect(plan.installed).toEqual(['0.5.0', '0.4.0', '0.3.0']);
+    }
   });
 });
 

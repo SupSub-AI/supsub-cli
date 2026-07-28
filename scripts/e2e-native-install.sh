@@ -70,12 +70,24 @@ if [ "$(link_target)" = "0.0.1" ]; then ok "symlink 重指到 0.0.1"; else bad "
 head "rollback：仅一个版本时干净报错（非崩溃）"
 reset_layout; place "$VER" link
 out="$("$SUPSUB_BIN_DIR/supsub" update --rollback 2>&1)"; code=$?
-if [ "$code" = 1 ] && printf '%s' "$out" | grep -q '没有可回滚'; then ok "exit 1 + 清晰报错"; else bad "预期 exit1+报错，得 exit=$code：$out"; fi
+if [ "$code" = 1 ] && printf '%s' "$out" | grep -q '只有当前版本'; then ok "exit 1 + 如实报'只有当前版本'"; else bad "预期 exit1+报错，得 exit=$code：$out"; fi
 # 先抓输出再喂 jq：命令本就以 exit 1 表达错误，pipefail 下直接 pipe 会误判。
 jout="$("$SUPSUB_BIN_DIR/supsub" -o json update --rollback 2>/dev/null)"
-if printf '%s' "$jout" | jq -e '.success==false and (.error|type=="object")' >/dev/null 2>&1; then
-  ok "json 模式返回合法错误信封"
-else bad "json 错误信封不合法：$jout"; fi
+if printf '%s' "$jout" | jq -e '.error.code=="ROLLBACK_NO_HISTORY"' >/dev/null 2>&1; then
+  ok "json: code=ROLLBACK_NO_HISTORY"
+else bad "只有一个版本的 json 错误码不符：$jout"; fi
+
+head "rollback：当前已是最旧但留存着更新版本 → 如实报错、不谎称仅一个版本"
+reset_layout; place "${VER}"; place 0.0.1 link   # 留存 2 个版本，symlink 指向更旧的 0.0.1
+out="$("$SUPSUB_BIN_DIR/supsub" update --rollback 2>&1)"; code=$?
+if [ "$code" = 1 ] && printf '%s' "$out" | grep -q '最旧' && printf '%s' "$out" | grep -q "v${VER}"; then
+  ok "exit1 + 文案说[最旧]并列出留存版本 v${VER}（不再谎称仅一个版本）"
+else bad "at-oldest 文案不符：exit=${code}：${out}"; fi
+jout="$("$SUPSUB_BIN_DIR/supsub" -o json update --rollback 2>/dev/null)"
+if printf '%s' "$jout" | jq --arg v "${VER}" -e '.error.code=="ROLLBACK_AT_OLDEST" and (.error.data.installed|index($v))' >/dev/null 2>&1; then
+  ok "json: code=ROLLBACK_AT_OLDEST 且 data.installed 含 ${VER}"
+else bad "at-oldest json 不符：${jout}"; fi
+[ "$(link_target)" = "0.0.1" ] && ok "失败后 symlink 未被改（仍 0.0.1）" || bad "symlink 被动了：$(link_target)"
 
 head "调度门限：以下条件一律不调度后台更新（无 update-state 产生）"
 assert_not_scheduled() { # $1=描述
