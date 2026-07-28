@@ -81,6 +81,12 @@ install_binary() {
   version_dir="${DATA_DIR}/versions/${VERSION}"
   version_bin="${version_dir}/${BINARY_NAME}"
 
+  # 幂等：目标版本已装且可执行，跳过下载（仅重建 symlink）。避免重复跑脚本时白下载。
+  if [ -x "$version_bin" ]; then
+    info "supsub v${VERSION} 已安装，跳过下载"
+    return
+  fi
+
   info "下载 supsub v${VERSION}（${PLATFORM}/${ARCH}）…"
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/supsub-install.XXXXXX")"
   # shellcheck disable=SC2064
