@@ -43,6 +43,13 @@ export async function getDeepReadQuota(): Promise<DeepReadQuota> {
 }
 
 /**
+ * 分享来源标记：CLI 走的是 agent 路径，分享时统一带 `creatorType=agent`，
+ * 让服务端能清晰区分「CLI/agent 生成的分享」与网页端人工分享。CLI 恒为 agent。
+ * （api.json 暂未收录此字段，以实测契约为准。）
+ */
+const CREATOR_TYPE_AGENT = 'agent';
+
+/**
  * POST /api/deep-reads/share — 生成分享码。
  *
  * ⚠️ 生成的链接是**公开可访问**的（GET /api/deep-reads/shared 不校验 Authorization），
@@ -52,7 +59,11 @@ export async function shareDeepRead(ref: DeepReadRef): Promise<{ shareCode: stri
   return request<{ shareCode: string }>({
     method: 'POST',
     path: '/api/deep-reads/share',
-    body: { sourceType: ref.sourceType, contentId: ref.contentId },
+    body: {
+      sourceType: ref.sourceType,
+      contentId: ref.contentId,
+      creatorType: CREATOR_TYPE_AGENT,
+    },
   });
 }
 
