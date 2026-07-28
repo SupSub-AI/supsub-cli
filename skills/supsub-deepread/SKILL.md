@@ -1,7 +1,7 @@
 ---
 name: supsub-deepread
 version: 0.1.0
-description: SupSub 精读（deep read）—— 对**已经在上下文里出现过的某一篇文章**做 AI 深度拆解，产出「一句话本质 / 干货成色 / 核心要点 / 分节正文 / 编辑批注（背景·立场·来源可信度·最弱一环）」。匹配「精读这篇」「深读一下」「帮我拆解这篇」「这篇讲透了吗」「这篇靠不靠谱 / 有没有干货 / 有没有立场」「值不值得看」「把这几篇都精读了做份简报」，以及「昨天那篇精读好了吗」「我还有哪些精读没看」。命令：`supsub deepread run / get / list / quota / share / drop / show`。⚠️ **精读消耗按月付费额度（实测 100 次/月）**，发起前必须先 `deepread quota` 并向用户复述「将消耗 N 次 / 本月剩 M 次」取得同意。⚠️ **contentId 必须来自本轮上下文**（sub contents / focus contents / search 的返回），匹配不到或匹配到多篇一律回问用户，绝不猜、绝不手写。⚠️ `deepread share` 生成的是**任何人可访问且无法撤销**的公开链接，生成前必须单独确认。只是浏览文章列表走 supsub-sub / supsub-focus，关键词搜文章走 supsub-search。
+description: SupSub 精读（deep read）—— 对**已经在上下文里出现过的某一篇文章**做 AI 深度拆解，产出「一句话本质 / 干货成色 / 核心要点 / 分节正文 / 编辑批注（背景·立场·来源可信度·最弱一环）」。匹配「精读这篇」「深读一下」「帮我拆解这篇」「这篇讲透了吗」「这篇靠不靠谱 / 有没有干货 / 有没有立场」「值不值得看」「把这几篇都精读了做份简报」，以及「昨天那篇精读好了吗」「我还有哪些精读没看」。命令：`supsub deepread run / get / list / quota / share / drop / show`。⚠️ **精读消耗按月付费额度**，发起前必须先 `deepread quota` 取当次余额并向用户复述「将消耗 N 次 / 本月剩 M 次」取得同意。⚠️ **contentId 必须来自本轮上下文**（sub contents / focus contents / search 的返回），匹配不到或匹配到多篇一律回问用户，绝不猜、绝不手写。⚠️ `deepread share` 生成的是**任何人可访问且无法撤销**的公开链接，生成前必须单独确认。只是浏览文章列表走 supsub-sub / supsub-focus，关键词搜文章走 supsub-search。
 ---
 
 # supsub-deepread Skill
@@ -20,7 +20,7 @@ description: SupSub 精读（deep read）—— 对**已经在上下文里出现
 
 ### ① 花钱门禁：发起精读前必须确认额度
 
-精读**按次扣月度额度**（实测 `limit=100`），且没有「撤销/退额度」的操作。所以：
+精读**按次扣月度额度**，且没有「撤销/退额度」的操作。额度上限随套餐/后端调整而变，**一律以 `deepread quota` 当次返回的 `limit` / `remaining` 为准，不要凭记忆里的数字向用户复述余额**。所以：
 
 1. 先 `supsub deepread quota -o json` 取 `{limit, used, remaining}`；
 2. 向用户复述：**要精读哪几篇（列标题）、将消耗几次、本月还剩几次**；
@@ -174,6 +174,7 @@ supsub deepread quota
 ```
 
 JSON shape: `{"success":true,"data":{"limit":100,"used":7,"remaining":93}}`
+（数值仅为示例，实际额度以当次返回为准）
 
 ---
 
