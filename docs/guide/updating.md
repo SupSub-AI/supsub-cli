@@ -24,7 +24,7 @@ supsub update --rollback      # 回滚到上一个留存版本（仅 native 安�
 - 更新完成后，下次运行即是新版本。
 - **native 安装**：新版本装到 `~/.local/share/supsub/versions/<版本>/` 并原子切换 symlink，旧版本保留最近 3 个可回滚，装在用户目录不需要 sudo。
 - **npm 安装**：原地替换 binary；若全局目录无写权限（需 sudo 的路径），会以退出码 `1` 报错并提示改用 `npm i -g @supsub/cli@latest` 或加 `sudo` 重试。
-- **manual（手装）安装自动迁移**：0.4.0 之前 `curl … | bash` 装下的是 `~/.local/bin/supsub` **普通文件**（未走版本并存），`doctor` 报 `manual`，原地覆盖后永远拿不到自动更新 / 回滚。这批用户下次 `supsub update` 会**自动迁移到 native 布局**：下载到 `versions/` 后用 symlink 原子替换那个普通文件，一次收敛，此后与 native 无异（版本并存 + 回滚 + 后台自动更新，下次启动生效）。手动 cp 到别处（如 `/usr/local/bin`）的独立二进制维持原地覆盖；npm 包（`node_modules` 内）一律不迁移（避免 PATH 遮蔽与包残留）。
+- **manual（手装）安装自动迁移**：0.4.0 之前 `curl … | bash` 装下的是 `~/.local/bin/supsub` **普通文件**（未走版本并存），`doctor` 报 `manual`，原地覆盖后永远拿不到自动更新 / 回滚。这批用户**只需跑一次 `supsub update`** 就会**自动迁移到 native 布局**：下载到 `versions/` 后用 symlink 原子替换那个普通文件，一次收敛，此后与 native 无异（版本并存 + 回滚 + 后台自动更新，下次启动生效）。**即使当前已是最新版本也会迁移，无需 `--force`**——「跑一次 update 必上 native 轨道」。此时输出如实说明「已是最新，且已迁移到 native 布局」（`updated=false` 而 `migrated=true`，两者独立）。手动 cp 到别处（如 `/usr/local/bin`）的独立二进制维持原地覆盖；npm 包（`node_modules` 内）一律不迁移（避免 PATH 遮蔽与包残留）。
 - 更新过程只访问 `registry.npmjs.org` 与 `github.com`，**不读取、不发送任何凭证**。
 
 ## 后台自动更新（仅 native 安装）

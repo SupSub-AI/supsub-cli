@@ -241,9 +241,10 @@ supsub update                       检查并更新到最新版本（并同步�
 >
 > **manual（手装）安装**：`supsub doctor` 报 `manual` 的独立二进制（多为 0.4.0 之前
 > `curl … | bash` 装下的普通文件）。若它正好位于 native 的 symlink 位（默认 `~/.local/bin/supsub`），
-> 下次 `supsub update` 会**自动迁移到 native 布局**（下载到 `versions/` 后用 symlink 原子替换那个
-> 普通文件），一次收敛——此后即拥有版本并存、回滚与后台自动更新。手动 cp 到别处（如
-> `/usr/local/bin`）的独立二进制则维持原地覆盖，不迁移。
+> 只需跑一次 `supsub update` 就会**自动迁移到 native 布局**（下载到 `versions/` 后用 symlink 原子
+> 替换那个普通文件），**即使当前已是最新版本也会迁移，无需 `--force`**——一次收敛，此后即拥有
+> 版本并存、回滚与后台自动更新。此时输出会如实说明「已是最新，且已迁移到 native 布局」。手动
+> cp 到别处（如 `/usr/local/bin`）的独立二进制则维持原地覆盖，不迁移。
 >
 > 更新完成后会顺带把本地 Agent Skills 同步到新版本（best-effort，失败只警告不阻断）。
 > 详见下方 [Skills（AI agent 集成）](#skillsai-agent-集成)。

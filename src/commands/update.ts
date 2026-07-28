@@ -5,13 +5,15 @@ import type { ErrorEnvelope } from '../lib/errors.ts';
 import { isErrorEnvelope } from '../lib/errors.ts';
 import {
   detectInstallMethod,
+  type InstallMethod,
   installNativeVersion,
   planRollback,
   planUpdateStrategy,
   pruneVersions,
   switchToVersion,
+  type UpdateStrategy,
 } from '../lib/install-layout.ts';
-import { checkForUpdate, performUpdate } from '../lib/self-update.ts';
+import { checkForUpdate, performUpdate, type UpdateCheck } from '../lib/self-update.ts';
 import { readSkillsState } from '../lib/skills-state.ts';
 import { type SyncResult, syncSkills } from '../lib/skills-sync.ts';
 import { output } from '../ui/output.ts';
@@ -144,16 +146,82 @@ export function registerUpdate(program: Command): void {
     );
 }
 
-/** update 主流程（检查 → 下载安装 → 同步 skills），抽出来让 rollback 分支更清晰 */
-async function runUpdate(
+/**
+ * update 的动作决策（纯函数，便于单测钉死行为矩阵）。输入三个已知量，输出「是否要动
+ * 二进制 + 是否走 native 安装路径 + 是否构成 manual→native 迁移」。
+ *
+ * 0.4.3 收敛点：被困手装用户（`strategy === 'migrate-to-native'`）**即使已是最新、未加
+ * `--force` 也要执行一次安装以完成迁移**——让「跑一次 update 必上 native 轨道」成立。
+ * 而 native / npm / dev 在已是最新且非 `--force` 时一律 `doBinaryWork=false`（走早退、只
+ * 校正 skills），绝不让普通用户每次 update 都产生下载。
+ */
+export type UpdateAction = {
+  /** 是否需要下载 / 安装二进制（false = 走「已是最新」早退，仅校正本地 skills） */
+  doBinaryWork: boolean;
+  /** 走 native 安装路径（装到 versions/ + 切 symlink）还是原地覆盖 */
+  goesNative: boolean;
+  /** 本次是否构成「manual → native」的布局迁移 */
+  migrated: boolean;
+};
+
+export function decideUpdateAction(input: {
+  hasUpdate: boolean;
+  force: boolean;
+  strategy: UpdateStrategy;
+}): UpdateAction {
+  const { hasUpdate, force, strategy } = input;
+  const migrated = strategy === 'migrate-to-native';
+  const goesNative = strategy === 'native' || strategy === 'migrate-to-native';
+  // 需要动二进制的三种情形：有新版本 / 强制重装 / 被困手装用户需迁移（即使已是最新）。
+  const doBinaryWork = hasUpdate || force || migrated;
+  return { doBinaryWork, goesNative, migrated };
+}
+
+/** runUpdate 的可注入依赖（默认接真实实现；测试注入 fake，不连网、不落真实文件） */
+export type RunUpdateDeps = {
+  /** 查最新版本（默认 checkForUpdate 查 npm registry） */
+  check?: () => Promise<UpdateCheck>;
+  /** 判定迁移前的安装方式（默认 detectInstallMethod，读运行中的真实二进制） */
+  detectMethod?: () => InstallMethod;
+  /** 安装策略（默认 planUpdateStrategy，读运行中的真实二进制 + symlink 位） */
+  planStrategy?: () => UpdateStrategy;
+  /** native 安装动作：装到 versions/ + 切 symlink + 清理旧版（默认真实实现） */
+  installNative?: (version: string) => Promise<void>;
+  /** 原地覆盖动作（默认 performUpdate） */
+  performInPlace?: (version: string) => Promise<unknown>;
+  /** skills 同步（默认 runSkillsSync） */
+  syncSkills?: (version: string, force: boolean) => Promise<SkillsOutcome>;
+};
+
+/** native 安装路径的默认动作：装到 versions/<latest> → 原子切 symlink → 清理旧版本。 */
+async function defaultInstallNative(version: string): Promise<void> {
+  // 下载 + 落盘（installNativeVersion）全部成功后，才用 switchToVersion 原子换 symlink。
+  // 迁移场景下 symlink 位当前是普通文件，rename 会原子地用 symlink 覆盖它；中途任一步
+  // 失败都发生在换 symlink 之前，那个普通文件原样健在（不会出现半残）。
+  await installNativeVersion(version);
+  switchToVersion(version);
+  pruneVersions(KEEP_VERSIONS);
+}
+
+/** update 主流程（检查 → 决策 → 下载安装 → 同步 skills），抽出来让 rollback 分支更清晰 */
+export async function runUpdate(
   opts: { check?: boolean; force?: boolean; skipSkills?: boolean },
   fmt: string | undefined,
+  deps: RunUpdateDeps = {},
 ): Promise<void> {
-  const { current, latest, hasUpdate } = await withSpinner('检查更新…', () => checkForUpdate());
+  const check = deps.check ?? checkForUpdate;
+  const detectMethod = deps.detectMethod ?? detectInstallMethod;
+  const planStrategy = deps.planStrategy ?? planUpdateStrategy;
+  const installNative = deps.installNative ?? defaultInstallNative;
+  const performInPlace = deps.performInPlace ?? performUpdate;
+  const doSkillsSync = deps.syncSkills ?? runSkillsSync;
 
-  // --check：只报告，不下载、不动 skills
+  const { current, latest, hasUpdate } = await withSpinner('检查更新…', () => check());
+
+  // --check：只读语义——任何情况下都不下载、不迁移、不动 skills（在算 strategy 之前就返回，
+  // 结构上保证 --check 永不触发迁移）。
   if (opts.check) {
-    output({ current, latest, hasUpdate, updated: false }, fmt, () => {
+    output({ current, latest, hasUpdate, updated: false, migrated: false }, fmt, () => {
       printTable({
         headers: ['字段', '值'],
         rows: [
@@ -166,56 +234,79 @@ async function runUpdate(
     return;
   }
 
-  // 已最新且非强制：二进制无需动，但仍校正本地 skills（可能落后）
-  if (!hasUpdate && !opts.force) {
+  // 安装策略与动作决策必须在「已是最新早退」之前算出：被困手装用户即使已是最新也要迁移收敛。
+  const method = detectMethod(); // 迁移前的安装方式（JSON 里如实报告，manual 会显示 manual）
+  const strategy = planStrategy();
+  const { doBinaryWork, goesNative, migrated } = decideUpdateAction({
+    hasUpdate,
+    force: opts.force ?? false,
+    strategy,
+  });
+
+  // 无需动二进制（已是最新、非 --force、且非待迁移）：二进制不动，只校正本地 skills（可能落后）。
+  // native / npm / dev 的快路径由此保持——绝不产生下载。
+  if (!doBinaryWork) {
     const skills = opts.skipSkills
       ? ({ action: 'in_sync' } as SkillsOutcome)
-      : await runSkillsSync(current, false);
-    output({ current, latest, hasUpdate: false, updated: false, skills }, fmt, () => {
-      process.stdout.write(`✅ 已是最新版本 v${current}\n`);
-      printSkillsHint(skills);
-    });
+      : await doSkillsSync(current, false);
+    output(
+      {
+        current,
+        latest,
+        hasUpdate: false,
+        updated: false,
+        method,
+        strategy,
+        migrated: false,
+        skills,
+      },
+      fmt,
+      () => {
+        process.stdout.write(`✅ 已是最新版本 v${current}\n`);
+        printSkillsHint(skills);
+      },
+    );
     return;
   }
 
-  // 下载并安装二进制。安装动作由 planUpdateStrategy 决定（纯函数，见 install-layout）：
-  // - native：装到 versions/<latest> 再原子切 symlink，保留最近 N 个版本供回滚；
-  // - migrate-to-native：被困手装用户（普通文件恰在 native symlink 位）——走同一条 native
-  //   路径，symlink 原子替换那个普通文件，一次性迁到版本并存布局；
-  // - in-place：npm / 手拷到别处的 manual——沿用原地暂存 + 原子 rename 覆盖（无版本并存）。
-  const method = detectInstallMethod(); // 迁移前的安装方式（JSON 里如实报告，manual 会显示 manual）
-  const strategy = planUpdateStrategy();
-  const goesNative = strategy === 'native' || strategy === 'migrate-to-native';
-  const migrated = strategy === 'migrate-to-native';
+  // 下载并安装二进制。目标版本 = latest（已是最新但要迁移 / --force 重装时 latest === current）。
+  // 安装动作由 strategy 决定（见 install-layout.planUpdateStrategy）：
+  // - native / migrate-to-native：走 native 路径（装到 versions/ 再原子切 symlink）；迁移场景
+  //   下 symlink 位当前是普通文件，会被 symlink 原子替换，一次性迁到版本并存布局；
+  // - in-place：npm / 手拷到别处的 manual——原地暂存 + 原子 rename 覆盖（无版本并存）。
   await withSpinner(`下载并安装 v${latest}…`, async () => {
     if (goesNative) {
-      // 下载 + 落盘（installNativeVersion）全部成功后，才用 switchToVersion 原子换 symlink。
-      // 迁移场景下 symlink 位当前是普通文件，rename 会原子地用 symlink 覆盖它；中途任一步
-      // 失败都发生在换 symlink 之前，那个普通文件原样健在（不会出现半残）。
-      await installNativeVersion(latest);
-      switchToVersion(latest);
-      pruneVersions(KEEP_VERSIONS);
+      await installNative(latest);
     } else {
-      await performUpdate(latest);
+      await performInPlace(latest);
     }
   });
 
-  // 二进制已更新，接着把本地 skills 同步到新版本（best-effort）
+  // 二进制已更新，接着把本地 skills 同步到目标版本（best-effort）
   const skills = opts.skipSkills
     ? ({ action: 'in_sync' } as SkillsOutcome)
-    : await runSkillsSync(latest, opts.force ?? false);
+    : await doSkillsSync(latest, opts.force ?? false);
 
+  // 输出语义诚实：`updated` = 版本是否变化（current → latest）；`migrated` = 布局是否变化。
+  // 两者独立——被困手装用户在已是最新时迁移，updated=false 而 migrated=true。
   output(
-    { current, latest, hasUpdate, updated: true, method, strategy, migrated, skills },
+    { current, latest, hasUpdate, updated: hasUpdate, method, strategy, migrated, skills },
     fmt,
     () => {
-      const from = current === latest ? `v${latest}（重新安装）` : `v${current} → v${latest}`;
-      const suffix = goesNative ? '（下次启动生效）' : '';
-      process.stdout.write(`✅ 已更新 ${from}${suffix}\n`);
-      if (migrated) {
+      if (migrated && !hasUpdate) {
+        // 版本没变但布局变了：已是最新，同时完成了 manual → native 的迁移。
         process.stdout.write(
-          '📦 已迁移到 native 布局（版本并存 + 可回滚），后台自动更新自此生效（下次启动）\n',
+          `✅ 已是最新（v${current}），已迁移到 native 布局（版本并存 + 可回滚），后台自动更新自此生效（下次启动）\n`,
         );
+      } else {
+        const from = hasUpdate ? `v${current} → v${latest}` : `v${latest}（重新安装）`;
+        const suffix = goesNative ? '（下次启动生效）' : '';
+        process.stdout.write(`✅ 已更新 ${from}${suffix}\n`);
+        if (migrated) {
+          process.stdout.write(
+            '📦 已迁移到 native 布局（版本并存 + 可回滚），后台自动更新自此生效（下次启动）\n',
+          );
+        }
       }
       printSkillsHint(skills);
     },
