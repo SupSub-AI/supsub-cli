@@ -29,6 +29,10 @@ npm i -g @supsub/cli
 
 支持 macOS / Linux / Windows（x64 / arm64）。npm 安装为手动更新（`supsub update` 或 `npm i -g @supsub/cli@latest`），不做后台自动更新。
 
+**方式三：让 AI 助手替你装**——把下面这句发给 Claude Code / Cursor 等助手，安装、技能包、登录一步到位：
+
+> 请阅读 https://raw.githubusercontent.com/SupSub-AI/supsub-cli/master/docs/cli-installation-guide.md 并据此帮我安装并配置 SupSub CLI
+
 ---
 
 ## 三步开始用

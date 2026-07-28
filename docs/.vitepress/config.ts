@@ -22,7 +22,13 @@ export default defineConfig({
 
   // 两篇面向维护者的内部设计文档（大量 mermaid 时序图）不进站点，
   // 仍留在仓库里供 GitHub 上直接阅读。
-  srcExclude: ['cli-auth-flow.md', 'self-update-flow.md'],
+  // cli-installation-guide.md 是给 AI agent 通过 raw URL 抓取执行的安装
+  // runbook（人类看 guide/installation 即可），同样不进站点。
+  srcExclude: [
+    'cli-auth-flow.md',
+    'self-update-flow.md',
+    'cli-installation-guide.md',
+  ],
 
   head: [
     // 标签页图标：SVG 优先（自带 prefers-color-scheme 适配，深色标签栏下墨块转纸色），

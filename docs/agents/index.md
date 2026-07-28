@@ -24,6 +24,14 @@
 
 这些都不是 SupSub 本身的功能，是 AI 助手拿到内容之后帮你做的加工。
 
+## 最省事的设置方式：让助手自己装
+
+把下面这句话直接发给你的 AI 助手，安装、技能包、登录它会一路带你走完（登录时它会给你一个链接，你在浏览器点一下确认即可）：
+
+> 请阅读 https://raw.githubusercontent.com/SupSub-AI/supsub-cli/master/docs/cli-installation-guide.md 并据此帮我安装并配置 SupSub CLI
+
+想自己动手的话，按下面手动设置。
+
 ## 怎么设置
 
 需要给助手装一个「技能包」，它才知道该怎么操作 SupSub。选你在用的工具：

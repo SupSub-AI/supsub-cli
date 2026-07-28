@@ -2,6 +2,12 @@
 
 本文只讲「如何装上并登录到可用」；完整命令清单见[命令参考](/reference/)。
 
+::: tip 在用 AI 助手？可以让它替你装
+把这句话发给 Claude Code / Cursor 等助手，安装、技能包、登录一步到位：
+
+> 请阅读 https://raw.githubusercontent.com/SupSub-AI/supsub-cli/master/docs/cli-installation-guide.md 并据此帮我安装并配置 SupSub CLI
+:::
+
 ## 环境要求
 
 - **支持平台**：macOS（x64 / arm64）、Linux（x64 / arm64）、Windows（x64）。CLI 本体是预编译可执行文件，**运行时不依赖 Node**。
