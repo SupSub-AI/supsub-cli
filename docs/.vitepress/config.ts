@@ -93,7 +93,7 @@ export default defineConfig({
             { text: 'search 搜索', link: '/reference/search' },
             { text: 'deepread 精读', link: '/reference/deepread' },
             { text: 'mp 公众号', link: '/reference/mp' },
-            { text: 'update / skills', link: '/reference/update' },
+            { text: 'update / doctor / skills', link: '/reference/update' },
           ],
         },
         {

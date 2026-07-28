@@ -6,11 +6,19 @@ SupSub CLI 是 [SupSub](https://supsub.net) 的命令行工具，让你在终端
 
 ### 第 1 步　安装
 
+macOS / Linux 推荐 native 安装（装到 `~/.local`、免 sudo、支持后台自动更新）：
+
+```shell
+curl -fsSL https://raw.githubusercontent.com/SupSub-AI/supsub-cli/master/scripts/install.sh | bash
+```
+
+或用 npm（跨平台，含 Windows）：
+
 ```shell
 npm i -g @supsub/cli
 ```
 
-支持 macOS / Linux / Windows（x64 / arm64）。CLI 本体是预编译可执行文件，**运行时不依赖 Node**——Node 只用于跑安装脚本。详见[安装](./installation)。
+支持 macOS / Linux / Windows（x64 / arm64）。CLI 本体是预编译可执行文件，**运行时不依赖 Node**。详见[安装](./installation)。
 
 ### 第 2 步　登录
 

@@ -1,13 +1,70 @@
-# SupSub CLI 自更新流程（二进制 + Skills）
+# SupSub CLI 自更新流程（native 安装 + 二进制 + Skills）
 
-> 本文以 mermaid 图为主，描述 SupSub CLI 的**两条自更新链路**及其协同：
-> 1. **CLI 二进制自更新**（`supsub update`）——查 npm registry 最新版，从 GitHub Release 下载对应平台 binary，原地替换。
+> 本文以 mermaid 图为主，描述 SupSub CLI 的自更新链路：
+> 0. **native 安装布局与后台静默自动更新**（对标 Claude Code）——装到 `~/.local` 版本并存、symlink 原子切换、detached 子进程后台升级。见下方「0.5」节。
+> 1. **CLI 二进制自更新**（`supsub update`）——查 npm registry 最新版，从 GitHub Release 下载对应平台 binary；native 安装装到 `versions/` 再切 symlink，npm 安装原地替换。
 > 2. **Skills 同步**（`supsub skills sync`，并在 `update` 时顺带执行）——把本仓库的 Agent Skills 同步到本地 agent 配置，并用「状态文件 + 漂移检测」解决「CLI/skills 发版后，用户本地 skills 没跟着更新」的问题。
 >
 > 实现位置：
-> `src/lib/self-update.ts`（二进制自更新）、`src/commands/update.ts`（update 命令）、
+> `src/lib/self-update.ts`（下载/解压/npm 原地替换）、`src/lib/install-layout.ts`（native 布局、安装方式判定、symlink 切换、版本清理、回滚目标）、
+> `src/lib/auto-update.ts`（调度门限、通道/门限判定、detached 子进程、后台更新）、`src/lib/update-state.ts`（后台更新状态文件）、
+> `src/commands/update.ts`（update / rollback）、`src/commands/doctor.ts`（自检）、
 > `src/lib/skills-sync.ts`（skills 同步）、`src/lib/skills-state.ts`（状态文件）、`src/lib/skills-check.ts`（漂移检测）、
-> `src/commands/skills.ts`（skills 命令组）、`src/cli/index.ts`（启动漂移提示）。
+> `src/commands/skills.ts`（skills 命令组）、`src/cli/index.ts`（后台更新调度 + 内部命令入口 + 启动漂移提示）。
+
+---
+
+## 0.5 native 安装布局与后台静默自动更新
+
+对标 Claude Code：**装在用户目录（永不 sudo）+ 版本并存（可回滚）+ symlink 原子切换 + detached 子进程静默升级**。npm 安装当前架构无法安全地静默自更新（全局目录可能需 sudo、原地覆盖不可回滚），故只有 native 安装才自动更新。
+
+### 布局
+
+```
+~/.local/share/supsub/versions/<version>/supsub   各版本二进制并存（保留最近 3 个）
+~/.local/bin/supsub -> …/versions/<version>/supsub  PATH 上的 symlink（切换 = 先写临时 symlink 再 rename）
+```
+
+- `SUPSUB_DATA_DIR` / `SUPSUB_BIN_DIR` 可覆盖两个目录（测试隔离 + 高级自定义）。
+- **安装方式判定**：`resolveRealBinary()`（realpath 穿透 symlink）落在 `versions/` 下即 native；bun/node 本体为 dev；其余为 npm。判定两端都过一遍 realpath，避免 `/tmp → /private/tmp` 这类 symlink 祖先导致漏判。
+
+### 后台更新（绝不阻塞当前命令）
+
+```mermaid
+flowchart TD
+    Start([任意命令启动]):::start --> Gate{"shouldScheduleAutoUpdate<br/>native? 非 json? 非 CI?<br/>未禁用? 超过检查阈值?"}:::dec
+    Gate -->|任一不满足| Skip["不调度（reason: disabled/ci/json/not-native/throttled）"]:::out
+    Gate -->|ok| Claim["抢占写 lastCheck=now<br/>（防并发重复 spawn）"]:::step
+    Claim --> Spawn["spawn(realBinary, ['__background-update'])<br/>detached + unref"]:::step
+    Spawn --> Cont["父进程立刻继续跑旧版命令并退出"]:::out
+
+    Spawn -. 独立于父进程生命周期 .-> Child([子进程 __background-update]):::start
+    Child --> Recheck{"再确认 native + 未禁用"}:::dec
+    Recheck -->|否| End0([静默退出]):::out
+    Recheck -->|是| Chk["checkForUpdate() 查 npm registry"]:::step
+    Chk -->|失败| RF["写 lastResult=failed"]:::err
+    Chk --> Elig{"evaluateEligibility<br/>通道(latest/stable) + minimumVersion"}:::dec
+    Elig -->|不符合| RG["写 lastResult=up-to-date / gated"]:::out
+    Elig -->|符合| Inst["installNativeVersion(latest)<br/>装到 versions/"]:::step
+    Inst --> Sw["switchToVersion(latest)<br/>原子切 symlink"]:::step
+    Sw --> Pr["pruneVersions(3) 清理旧版"]:::step
+    Pr --> RU["写 lastResult=updated（新版下次启动生效）"]:::out
+
+    classDef start fill:#e2e8f0,stroke:#475569,color:#111;
+    classDef step fill:#bfdbfe,stroke:#1d4ed8,color:#111;
+    classDef dec fill:#fde68a,stroke:#b45309,color:#111;
+    classDef out fill:#bbf7d0,stroke:#15803d,color:#111;
+    classDef err fill:#fecaca,stroke:#b91c1c,color:#111;
+```
+
+关键取舍：
+
+- **为什么用 detached 子进程而非「命令结束后 await」**：CLI 是短生命周期进程，主命令一结束进程就退出，挂在事件循环上的异步下载会被掐断。`spawn(detached:true) + unref()` 的子进程独立于父进程生命周期，父进程退出后仍能把下载/切版跑完（已实测：父进程 158ms 退出，子进程约 520ms 后写入结果）。
+- **内部命令入口**：`__background-update` 在 `cli/index.ts` 顶部拦截，不进 commander（不污染 help/version）。
+- **门限**：`autoUpdateChannel`（`latest` 默认 / `stable` 只自动升 patch——比「延迟发布」实现更简、对小项目更实用）与 `minimumVersion`（自动更新不得降到其以下），存 `~/.supsub/config.json`。
+- **静默与 opt-out**：`-o json` / CI 永不自动更新；`SUPSUB_DISABLE_AUTOUPDATER=1` 关闭后台检查；均复用 `skills-check.ts` 的 `isTruthyEnv` / `isCIEnv` 语义。
+- **回滚**：`supsub update --rollback` 把 symlink 重指到上一个留存版本，不重新下载。
+- **自检**：`supsub doctor` 暴露安装方式、真实路径、symlink 指向、留存版本、上次检查时间与结果、PATH、skills 状态。
 
 ---
 
