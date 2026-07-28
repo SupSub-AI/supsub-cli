@@ -14,6 +14,8 @@ import { registerDeepReadQuota } from '../commands/deepread/quota.ts';
 import { registerDeepReadRun } from '../commands/deepread/run.ts';
 import { registerDeepReadShare } from '../commands/deepread/share.ts';
 import { registerDeepReadShow } from '../commands/deepread/show.ts';
+// Doctor command（安装 / 更新自检）
+import { registerDoctor } from '../commands/doctor.ts';
 // Focus commands
 import { registerFocusContents } from '../commands/focus/contents.ts';
 import { registerFocusList } from '../commands/focus/list.ts';
@@ -45,6 +47,11 @@ import { registerUnread } from '../commands/unread.ts';
 // Self-update command
 import { registerUpdate } from '../commands/update.ts';
 import { setCliApiUrl } from '../lib/api-url.ts';
+import {
+  BACKGROUND_UPDATE_ARGV,
+  maybeScheduleAutoUpdate,
+  runBackgroundUpdate,
+} from '../lib/auto-update.ts';
 import { dieWith, type ErrorEnvelope, isErrorEnvelope } from '../lib/errors.ts';
 import { checkSkillsDrift, formatDriftNotice } from '../lib/skills-check.ts';
 
@@ -88,7 +95,26 @@ export function isJsonOutput(argv: string[]): boolean {
   );
 }
 
+/**
+ * 是否应为本次启动调度一次后台自动更新检查：
+ * - `update` 命令自身在处理更新，避免与它并发切 symlink，跳过；
+ * - 无子命令（纯 `supsub` / 只带全局 flag）不调度，减少无意义打网。
+ */
+function shouldConsiderAutoUpdate(argv: string[]): boolean {
+  const first = argv.find((a) => !a.startsWith('-'));
+  if (!first) return false;
+  if (first === 'update' || first === 'upgrade' || first === BACKGROUND_UPDATE_ARGV) return false;
+  return true;
+}
+
 export async function run(): Promise<void> {
+  // 内部命令：detached 后台自更新子进程入口。由 maybeScheduleAutoUpdate spawn 拉起，
+  // 不进 commander（避免污染 help / version）。跑完即退，绝不影响任何用户命令。
+  if (process.argv[2] === BACKGROUND_UPDATE_ARGV) {
+    await runBackgroundUpdate();
+    return;
+  }
+
   const program = new Command();
 
   program
@@ -163,9 +189,20 @@ export async function run(): Promise<void> {
   // ─── update 命令（自更新） ────────────────────────────────
   registerUpdate(program);
 
+  // ─── doctor 命令（安装 / 更新自检） ───────────────────────
+  registerDoctor(program);
+
   // skills 漂移提示：本地 skills 落后于当前 CLI 版本时，在 stderr 提示同步。
   // 仅一次本地状态文件读，零网络、零子进程；skills / update 命令本身在处理同步，不重复打扰。
   maybeWarnSkillsDrift();
+
+  // 后台自动更新：仅 native 安装、非 json / CI / 未禁用、且距上次检查超阈值时，
+  // spawn 一个 detached 子进程去异步下载 + 切 symlink。本次只做本地状态读 + 一次 spawn，
+  // 绝不阻塞当前命令；新版本下次启动才生效。
+  const argv = process.argv.slice(2);
+  if (shouldConsiderAutoUpdate(argv)) {
+    maybeScheduleAutoUpdate(isJsonOutput(argv));
+  }
 
   // 顶层 try/catch：捕获所有命令抛出的错误并统一处理（exit code 由 errors.ts 推导）
   try {

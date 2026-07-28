@@ -1,4 +1,4 @@
-# `update` / `skills`
+# `update` / `doctor` / `skills`
 
 ## `update` — CLI 自更新
 
@@ -8,16 +8,29 @@
 | `supsub update --check` | 只检查是否有新版本，输出 `current` / `latest` / `hasUpdate`，不实际更新（不动 skills） |
 | `supsub update --force` | 即使已是最新也重新下载安装（修复损坏的 binary），并重新同步 skills |
 | `supsub update --skip-skills` | 本次更新不同步本地 skills |
+| `supsub update --rollback` | 回滚到上一个留存版本（仅 native 安装，重指 symlink，不重新下载） |
 
 说明：
 
 - 更新完成后，下次运行即是新版本。
-- 若全局安装目录无写权限（如装在需 sudo 的路径），会以退出码 `1` 报错并提示改用 `npm i -g @supsub/cli@latest` 或加 `sudo` 重试。
+- **native 安装**：新版本下载到 `~/.local/share/supsub/versions/<版本>/` 并原子切换 symlink，旧版本保留最近 3 个可回滚，装在用户目录不需要 sudo。
+- **npm 安装**：原地替换 binary；若全局目录无写权限（如需 sudo 的路径），会以退出码 `1` 报错并提示改用 `npm i -g @supsub/cli@latest` 或加 `sudo` 重试。
 - 更新过程只访问 `registry.npmjs.org` 与 `github.com`，不读取 / 不发送任何凭证。
 
-::: tip 不做后台自动更新
-CLI 本身不做后台自动更新，也不在启动时检查新版本。除 `supsub update` 外，也可随时用包管理器手动更新：`npm i -g @supsub/cli@latest`（会触发 postinstall 重新下载 binary）。
+::: tip native 安装会后台静默自动更新
+native 安装（`curl … | bash`）会在后台定期检查并升级，新版本**下次启动才生效**，不打断当前命令。`-o json` 与 CI 环境下**永不**自动更新；设 `SUPSUB_DISABLE_AUTOUPDATER=1` 可完全关闭后台检查。npm 安装保持手动更新（`supsub update` 或 `npm i -g @supsub/cli@latest`）。
+
+可在 `~/.supsub/config.json` 配置 `autoUpdateChannel`（`latest` 默认 / `stable` 只自动升 patch）与 `minimumVersion`（自动更新不会低于此版本）。
 :::
+
+## `doctor` — 安装 / 更新自检
+
+```shell
+supsub doctor          # 人类可读表格
+supsub doctor -o json  # 供 agent / 脚本解析
+```
+
+输出：当前版本与真实路径、安装方式（native / npm）、symlink 指向哪个版本、本地留存的版本列表、上次后台更新检查的时间与结果（含失败原因）、`~/.local/bin` 是否在 `PATH`、以及本地 skills 同步状态。静默自动更新出问题时，这里是第一查证入口。
 
 ## `skills` — Agent Skills 同步
 

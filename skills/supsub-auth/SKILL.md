@@ -10,7 +10,7 @@ Log in, log out, and check authentication status for the SupSub CLI.
 
 ## Prerequisites
 
-- 安装：`pnpm add -g @supsub/cli`（或 `npm i -g @supsub/cli`）
+- 安装：`curl -fsSL https://raw.githubusercontent.com/SupSub-AI/supsub-cli/master/scripts/install.sh | bash`（native 安装，装到 `~/.local`、支持后台自动更新）；或包管理器 `npm i -g @supsub/cli` / `pnpm add -g @supsub/cli`
 - 登录凭证保存在 `~/.supsub/config.json`（目录权限 0700，文件权限 0600）。`supsub auth login` 走 OAuth 设备授权，成功后写入 `access_token` / `refresh_token`。**CLI 不支持 API Key 登录**，没有 `--api-key` flag / `SUPSUB_API_KEY` 这一类入口。
 - **令牌会自动续期**：`access_token` 约 24 小时到期，CLI 在过期前（或收到 401 时）用 `refresh_token` 自动换新令牌并写回配置文件，全程无感。`refresh_token` 约 14 天有效，只有它也失效时才需要重新 `supsub auth login`。
 

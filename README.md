@@ -13,11 +13,21 @@
 
 ## 安装
 
+**方式一：native 安装（推荐，macOS / Linux）**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SupSub-AI/supsub-cli/master/scripts/install.sh | bash
+```
+
+装到用户目录 `~/.local`（永不需要 sudo），版本并存可回滚，并支持**后台静默自动更新**。安装后若提示 `~/.local/bin` 不在 `PATH`，按提示把它加入 shell 配置即可。
+
+**方式二：npm（跨平台，含 Windows）**
+
 ```bash
 npm i -g @supsub/cli
 ```
 
-支持 macOS / Linux / Windows（x64 / arm64）。
+支持 macOS / Linux / Windows（x64 / arm64）。npm 安装为手动更新（`supsub update` 或 `npm i -g @supsub/cli@latest`），不做后台自动更新。
 
 ---
 
@@ -212,17 +222,34 @@ supsub mp search-cancel <searchId>  取消正在执行的搜索任务
 ### 自更新
 
 ```
-supsub update                       检查并更新到最新版本（下载新 binary 原地替换，并同步本地 skills）
+supsub update                       检查并更新到最新版本（并同步本地 skills）
   --check                           只检查是否有新版本，不实际更新
   --force                           即使已是最新也重新下载安装（修复损坏的 binary）
   --skip-skills                     本次更新不同步本地 skills
+  --rollback                        回滚到上一个留存版本（仅 native 安装，重指 symlink，不重新下载）
 ```
 
-> 自更新会检查并安装最新版本。若全局安装目录无写权限（如装在需 sudo 的路径），
-> 会提示改用 `npm i -g @supsub/cli@latest` 或加 `sudo` 重试。
+> **native 安装**：下载新版本到 `~/.local/share/supsub/versions/<版本>/` 并原子切换 symlink，
+> 旧版本保留最近 3 个可回滚（`supsub update --rollback`）。装在用户目录，永不需要 sudo。
+>
+> **npm 安装**：下载新 binary 原地替换。若全局目录无写权限（需 sudo 的路径），会提示改用
+> `npm i -g @supsub/cli@latest` 或加 `sudo` 重试。
 >
 > 更新完成后会顺带把本地 Agent Skills 同步到新版本（best-effort，失败只警告不阻断）。
 > 详见下方 [Skills（AI agent 集成）](#skillsai-agent-集成)。
+
+**后台自动更新（仅 native 安装）**：native 安装会在后台静默检查并升级，新版本**下次启动才生效**，
+不打断当前命令。`-o json` / CI 环境下**永不**自动更新（那正是 agent / 脚本在跑）。设
+`SUPSUB_DISABLE_AUTOUPDATER=1` 可完全关闭后台检查（`supsub update` 手动更新仍可用）。
+可在 `~/.supsub/config.json` 配置 `autoUpdateChannel`（`latest` 默认 / `stable` 只自动升 patch）
+与 `minimumVersion`（自动更新不会低于此版本）。
+
+### 自检
+
+```
+supsub doctor                       安装 / 更新自检：当前版本与真实路径、安装方式、symlink 指向、
+                                    留存版本、上次更新检查时间与结果、~/.local/bin 是否在 PATH、skills 同步状态
+```
 
 ### Skills 同步
 
@@ -256,6 +283,9 @@ supsub skills list                  列出本仓库提供的 skills
 | `SUPSUB_NO_SPINNER` | 设为真值时关闭所有 loading 动画（非 TTY 下本就不渲染） |
 | `SUPSUB_NO_SKILLS_NOTIFIER` | 设为真值时关闭「本地 skills 落后」的启动提示 |
 | `SUPSUB_CONFIG_DIR` | 覆盖配置 / 状态文件目录（默认 `~/.supsub`） |
+| `SUPSUB_DISABLE_AUTOUPDATER` | 设为真值时关闭 native 安装的后台自动更新（手动 `supsub update` 仍可用） |
+| `SUPSUB_DATA_DIR` | 覆盖 native 安装的版本并存根目录（默认 `~/.local/share/supsub`） |
+| `SUPSUB_BIN_DIR` | 覆盖 native 安装的 symlink 目录（默认 `~/.local/bin`） |
 ---
 
 ## Skills（AI agent 集成）

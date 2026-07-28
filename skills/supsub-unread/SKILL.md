@@ -10,7 +10,7 @@ description: SupSub 未读管理（工作流）—— 一条命令看全所有�
 
 ## Prerequisites
 
-- 安装：`pnpm add -g @supsub/cli`（或 `npm i -g @supsub/cli`）
+- 安装：`curl -fsSL https://raw.githubusercontent.com/SupSub-AI/supsub-cli/master/scripts/install.sh | bash`（native 安装，装到 `~/.local`、支持后台自动更新）；或包管理器 `npm i -g @supsub/cli` / `pnpm add -g @supsub/cli`
 - 已登录：`supsub auth status` 显示 Authenticated（首次使用先 `supsub auth login`）
 - **未授权（exit 2 / UNAUTHORIZED）时不要止步于「你未登录」**：直接运行 `supsub auth login` 为用户打开浏览器授权（命令会自动打开浏览器并阻塞等待授权，请用足够长的超时，如 10 分钟；用户只需在浏览器点确认，无需在终端输入任何内容），授权成功后重试原命令。无浏览器 / 无头环境再回退为提示用户 `SUPSUB_NO_BROWSER=1 supsub auth login`。
 

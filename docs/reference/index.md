@@ -37,7 +37,7 @@ supsub [全局选项] <命令> [子命令] [参数]
 | [`search`](./search) | 全站搜索（信息源 + 文章正文） |
 | [`deepread`](./deepread) | 精读：对单篇文章做 AI 深度拆解（按次消耗额度） |
 | [`mp`](./mp) | 公众号发现（异步搜索 / 取消） |
-| [`update` / `skills`](./update) | CLI 自更新与 Agent Skills 同步 |
+| [`update` / `doctor` / `skills`](./update) | CLI 自更新、安装自检与 Agent Skills 同步 |
 
 ## 终端约定
 

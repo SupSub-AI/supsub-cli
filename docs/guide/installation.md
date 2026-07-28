@@ -4,18 +4,34 @@
 
 ## 环境要求
 
-- **Node.js ≥ 20**：仅用于执行 npm 安装与 postinstall 下载脚本。CLI 本体是预编译可执行文件，**运行时不依赖 Node**。
-- **支持平台**：macOS（x64 / arm64）、Linux（x64 / arm64）、Windows（x64）。
-- **包管理器**：npm（推荐）或 pnpm。
-- **网络**：安装期间需访问 `registry.npmjs.org` 与 `github.com`（postinstall 从 GitHub Release 下载对应平台 binary）。
+- **支持平台**：macOS（x64 / arm64）、Linux（x64 / arm64）、Windows（x64）。CLI 本体是预编译可执行文件，**运行时不依赖 Node**。
+- **native 安装**：仅需 `curl` 与 `tar`（macOS / Linux 自带），无需 Node。
+- **npm 安装**：需 **Node.js ≥ 20**（仅用于执行 npm 安装与 postinstall 下载脚本）。
+- **网络**：安装期间需访问 `registry.npmjs.org` 与 `github.com`（从 GitHub Release 下载对应平台 binary）。
 
 ## 第 1 步　安装
+
+### 方式一：native 安装（推荐，macOS / Linux）
+
+```shell
+curl -fsSL https://raw.githubusercontent.com/SupSub-AI/supsub-cli/master/scripts/install.sh | bash
+```
+
+装到用户目录 `~/.local`（版本并存于 `~/.local/share/supsub/versions/`，`~/.local/bin/supsub` 为指向当前版本的链接），**永不需要 sudo**，且支持**后台静默自动更新**与一键回滚。看到 `安装成功 🎉` 即完成。
+
+若脚本提示 `~/.local/bin` 不在 `PATH`，把它加入 shell 配置后重开终端：
+
+```shell
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### 方式二：npm（跨平台，含 Windows）
 
 ```shell
 npm i -g @supsub/cli
 ```
 
-安装过程中 postinstall 会自动从 GitHub Release 下载与当前系统匹配的预编译 binary，并在全局 bin 目录创建 `supsub` 链接。看到 `supsub installed at …` 即安装成功。
+安装过程中 postinstall 会自动从 GitHub Release 下载与当前系统匹配的预编译 binary，并在全局 bin 目录创建 `supsub` 链接。npm 安装为**手动更新**，不做后台自动更新。
 
 ::: tip 用 pnpm 安装
 也可用 `pnpm add -g @supsub/cli`。注意 postinstall 的链接逻辑以 **npm 全局 bin** 为准；若用 pnpm 安装后 `supsub` 不在 `PATH`，请确认 npm 全局 bin 目录（`npm prefix -g` 下的 `bin`）已加入 `PATH`，或改用 `npm i -g`。
@@ -70,15 +86,20 @@ supsub --output json auth status
 ## 升级
 
 ```shell
-supsub update            # 自更新到最新版本（下载新 binary 原地替换，并同步本地 skills）
+supsub update            # 自更新到最新版本（并同步本地 skills）
 supsub update --check    # 只检查是否有新版本，不实际更新
+supsub doctor            # 自检：安装方式、当前版本、上次更新检查、PATH、skills 同步状态
 ```
 
-也可用包管理器：`npm i -g @supsub/cli@latest`（会触发 postinstall 重新下载 binary）。完整说明见[升级与 Skills 同步](./updating)。
+native 安装还会在后台静默自动升级（新版本下次启动生效）。npm 安装也可用包管理器：`npm i -g @supsub/cli@latest`。完整说明见[升级与 Skills 同步](./updating)。
 
 ## 卸载
 
 ```shell
+# native 安装
+rm -rf ~/.local/share/supsub ~/.local/bin/supsub
+
+# npm 安装
 npm rm -g @supsub/cli
 ```
 

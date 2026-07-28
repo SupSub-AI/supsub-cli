@@ -8,6 +8,9 @@
 | `SUPSUB_NO_SPINNER` | 真值时关闭所有 loading 动画（非 TTY 下本就不渲染） | 未设 |
 | `SUPSUB_NO_SKILLS_NOTIFIER` | 真值时关闭「本地 skills 落后」的启动提示 | 未设 |
 | `SUPSUB_CONFIG_DIR` | 覆盖配置 / 状态文件目录 | `~/.supsub` |
+| `SUPSUB_DISABLE_AUTOUPDATER` | 真值时关闭 native 安装的后台自动更新（手动 `supsub update` 仍可用） | 未设 |
+| `SUPSUB_DATA_DIR` | 覆盖 native 安装的版本并存根目录 | `~/.local/share/supsub` |
+| `SUPSUB_BIN_DIR` | 覆盖 native 安装的可执行文件 symlink 目录 | `~/.local/bin` |
 
 ## 凭证存储
 
@@ -26,3 +29,7 @@ export SUPSUB_NO_BROWSER=1
 export SUPSUB_NO_SPINNER=1
 export SUPSUB_CONFIG_DIR=/tmp/supsub-ci
 ```
+
+::: tip 后台自动更新只在 native 安装下发生
+`-o json` 与 CI 环境下**永不**自动更新，无需额外设置。若想在 native 安装下也彻底关闭后台检查，设 `SUPSUB_DISABLE_AUTOUPDATER=1`。
+:::

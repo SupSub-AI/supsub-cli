@@ -3,7 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-type Config = {
+export type Config = {
   /** 设备授权得到的访问令牌（accessToken），CLI 的主凭证。 */
   access_token?: string;
   /** 设备授权得到的刷新令牌（refreshToken），用于后续续期。 */
@@ -20,6 +20,18 @@ type Config = {
    * 仅在 access_token 缺失时回落使用，401 时与其一同被清除。
    */
   bearer_token?: string;
+  /**
+   * 后台自动更新通道（对标 Claude Code 的 channel）：
+   * - `latest`（默认）：跟随最新版本，patch/minor/major 都自动升。
+   * - `stable`：只自动升 **patch**；minor/major 仍需手动 `supsub update`。
+   * 仅影响 native 安装的后台静默更新；手动 `supsub update` 不受此约束。
+   */
+  autoUpdateChannel?: 'latest' | 'stable';
+  /**
+   * 自动更新版本门限（对标 Claude Code 的 minimumVersion）：
+   * 后台自动更新的目标版本不得低于此值。用于「钉住不回退到某个已知有问题的低版本」。
+   */
+  minimumVersion?: string;
 };
 
 /**
