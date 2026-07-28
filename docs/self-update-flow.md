@@ -66,6 +66,20 @@ flowchart TD
 - **回滚**：`supsub update --rollback` 把 symlink 重指到上一个留存版本，不重新下载。
 - **自检**：`supsub doctor` 暴露安装方式、真实路径、symlink 指向、留存版本、上次检查时间与结果、PATH、skills 状态。
 
+### ⚠️ 回滚能力依赖「当前运行的版本」，不是要回滚到的版本
+
+`supsub update --rollback` 是**当前正在跑的这个二进制**里的代码在执行。也就是说：**能不能回滚，取决于当前版本、而非目标版本。** 如果某个版本把 rollback 逻辑写坏了（或删掉了这个功能），用户升上去后就会被**困在那个版本**——`--rollback` 自己也坏了，无法自救。
+
+推论与约束：
+
+- rollback 相关代码（`install-layout.ts` 的 `switchToVersion` / `previousInstalledVersion` / `planRollback`、`update.ts` 的 `handleRollback`）属于「一旦损坏就无法靠自身自救」的关键路径，改动务必保守，单测要覆盖到边界（尤其「当前已是最旧、但留存着更新版本」这一分支）。
+- **手动兜底**：即便 CLI 的回滚坏了，用户仍可手动重指 symlink 自救——版本并存于 `~/.local/share/supsub/versions/`，直接把 `~/.local/bin/supsub` 指到想用的那版即可：
+
+  ```shell
+  ls ~/.local/share/supsub/versions            # 看有哪些留存版本
+  ln -sfn ~/.local/share/supsub/versions/<版本>/supsub ~/.local/bin/supsub   # 手动切回
+  ```
+
 ---
 
 ## 0. 为什么需要两条链路
