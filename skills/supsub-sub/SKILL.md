@@ -1,6 +1,7 @@
 ---
 name: supsub-sub
-version: 0.1.5
+metadata:
+  version: "0.1.5"
 description: SupSub 订阅管理 —— 列出 / 添加 / 删除订阅源（微信公众号 MP、网站 WEBSITE、推特 X），浏览某个已订阅源里的文章列表（支持翻页），以及把某个源整源标记为已读。匹配「列出我的订阅」「我订阅了哪些」「取消订阅某个号」「订阅某个公众号 / 网站」「看某个订阅里有哪些文章」「某公众号最近的未读文章」「添加 / 删除订阅源」「看更早的文章 / 翻页」「这个号我读完了 / 整源标记已读」。⚠️ 已读只有**整源**一档（`mark-read --all`，不可逆）：文章没有「详情 / 阅读」这一步，故不支持单篇标记已读。⚠️ 也匹配**用主体名指代自己订阅源**的浏览句式：「看一下最近 X 的内容」「X 最近有什么」「X 更新了吗」「读读 X」—— 遇到这类请求先 `supsub sub list` 比对 X 是不是已订阅的源名（包含匹配、忽略大小写），命中就用 `sub contents` 拉该源内容，**不要**当成全站关键词搜索；没命中则直接改用 supsub-search 执行全站搜索（**不要反问用户要不要搜**）。⚠️ 本 skill 里 `--type X` 专指推特/Twitter 平台账号；用户口语「订阅 X」「X 公众号」中的字母 X 往往只是占位、代指某个具体账号，并不等于 `--type X`。⚠️ 动词判别：本 skill 只认「订阅 / 订阅了」；用户说「关注 / 关注了 / 我关注了哪些 / 我的关注点」时走 supsub-focus（关注点），不是本 skill。⚠️ 不用于跨订阅搜索文章关键词（走 supsub-search），也不用于「发现一个新的公众号」（走 supsub-mp）。
 ---
 
@@ -25,6 +26,14 @@ List, add, remove subscription sources, and browse the articles inside each sour
 - 安装：`curl -fsSL https://raw.githubusercontent.com/SupSub-AI/supsub-cli/master/scripts/install.sh | bash`（native 安装，装到 `~/.local`、支持后台自动更新）；或包管理器 `npm i -g @supsub/cli` / `pnpm add -g @supsub/cli`
 - 已登录：`supsub auth status` 显示 Authenticated（首次使用先 `supsub auth login`）
 - **未授权（exit 2 / UNAUTHORIZED）时不要止步于「你未登录」**：直接运行 `supsub auth login` 为用户打开浏览器授权（命令会自动打开浏览器并阻塞等待授权，请用足够长的超时，如 10 分钟；用户只需在浏览器点确认，无需在终端输入任何内容），授权成功后重试原命令。无浏览器 / 无头环境再回退为提示用户 `SUPSUB_NO_BROWSER=1 supsub auth login`。
+
+## 调用频率限制
+
+本 skill 涉及的订阅功能当前限制为 **每分钟最多调用 100 次**，适用于公众号（`MP`）、网站（`WEBSITE`）和 X（`X`）订阅操作。
+
+- 批量操作和自动翻页时控制请求频率，避免密集并发调用；建议串行请求，相邻请求至少间隔 1 秒。
+- `sub contents` 每请求一页都会发起一次接口调用；`--page-size 100` 表示每页最多 100 篇文章，与每分钟 100 次的调用限制是两个独立限制。
+- 收到限流错误时，按服务端提示等待后再重试；未给出等待时间时，等待 60 秒后重试一次。若仍被限流，停止本轮批量操作并向用户说明。
 
 ## Commands
 
@@ -155,7 +164,7 @@ supsub sub contents --source-id <id> --type <MP|WEBSITE|X> [--unread | --all] [-
 | `--type` | required | `MP`（公众号）/ `WEBSITE`（网站）/ `X`（推特） |
 | `--unread` | (default) | 仅返回未读文章 |
 | `--all` | — | 返回全部文章（已读 + 未读） |
-| `--brief` | — | 精简输出：只留 `contentId` / `title` / `publishedAt(+Text)` / `isRead` |
+| `--brief` | — | 精简输出：只留 `contentId` / `title` / `originalTitle` / `publishedAt(+Text)` / `isRead` |
 | `--page` | 1 | 页码（正整数） |
 | `--page-size` | 20 | 每页条数，1-100 |
 
@@ -175,8 +184,9 @@ supsub sub contents --source-id <id> --type <MP|WEBSITE|X> [--unread | --all] [-
 **批量枚举一律加 `--brief`**：默认输出每条都带 `summary` / `coverImage` / `tags`，100 条约 90KB，
 足以撑爆工具输出上限被迫落盘；`--brief` 同样 100 条只有约 14KB。只在需要给用户讲内容时才用完整输出。
 
-每行字段：`contentId`, `url`, `title`, `coverImage`, `tags[]`, `summary`, `publishedAt`, `publishedAtText`, `isRead`。
-`--brief` 时只有 `contentId`, `title`, `publishedAt`, `publishedAtText`, `isRead`。
+每行字段：`contentId`, `url`, `title`, `originalTitle`, `coverImage`, `tags[]`, `summary`, `publishedAt`, `publishedAtText`, `isRead`。
+`--brief` 时只有 `contentId`, `title`, `originalTitle`, `publishedAt`, `publishedAtText`, `isRead`。
+`originalTitle` 是上游返回的原始标题，适用于 `MP`、`WEBSITE` 和 `X`，完整及精简 JSON 输出均保留。
 
 > `publishedAt` 是 Unix 秒级时间戳（少数后端版本为字符串），**`publishedAtText` 是 CLI 已格式化好的
 > `"YYYY-MM-DD HH:mm"`，直接用即可，不要自己写 `date -r` / 时间戳转换**。排序仍用 `publishedAt`。
@@ -198,7 +208,7 @@ supsub sub contents --source-id 12345 --type MP --page-size 100 -o json
 supsub sub contents --source-id 12345 --type MP --all -o json
 ```
 
-JSON shape: `{"success":true,"data":[{"contentId":"...","url":"...","title":"...","coverImage":"...","tags":[...],"summary":"...","publishedAt":<timestamp 或字符串>,"isRead":false}, ...]}`
+JSON shape: `{"success":true,"data":[{"contentId":"...","url":"...","title":"...","originalTitle":"...","coverImage":"...","tags":[...],"summary":"...","publishedAt":<timestamp 或字符串>,"isRead":false}, ...]}`
 
 > `publishedAt` 的原始形态随后端版本而异（Unix 秒数字 / `"YYYY-MM-DD HH:mm:ss"` 字符串），
 > **不用自己兼容——直接读 CLI 补好的 `publishedAtText`**（恒为 `"YYYY-MM-DD HH:mm"`）。

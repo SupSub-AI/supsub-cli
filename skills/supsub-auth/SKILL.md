@@ -1,6 +1,7 @@
 ---
 name: supsub-auth
-version: 0.1.2
+metadata:
+  version: "0.1.2"
 description: SupSub CLI 认证管理 —— 登录 / 登出 / 查看登录状态。登录走 OAuth 浏览器设备授权，CLI 不支持 API Key 登录。匹配「supsub 登录」「supsub 登出」「查看我在 supsub 的登录状态」「我现在 supsub 用的是哪个账号」「supsub auth login / logout / status」。在调用其他 supsub 子命令前，如不确定凭证状态可先用本 skill 跑 `supsub auth status`。
 ---
 

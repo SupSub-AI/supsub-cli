@@ -1,6 +1,7 @@
 ---
 name: supsub-search
-version: 0.1.3
+metadata:
+  version: "0.1.3"
 description: SupSub 全文搜索 —— 在订阅源（公众号 / 网站）和文章正文里跨源搜索内容。用户说「搜一下 X 相关的内容 / 文章」「在 supsub 里搜 X」「查 X 相关文章」「全文搜索 X」「找 X 的内容」「search articles/content in SupSub」时使用本 skill。⚠️ 范围判定看**动词意图**：「搜 / 查 / 全文搜 X」是检索意图 → 走本 skill（全站）；但「**看一下最近 X 的内容**」「X 最近有什么」「X 更新了吗」是**浏览某个主体的内容流**，必须先用 `supsub sub list` / `supsub focus list` 比对 X 是不是用户已订阅的源名或关注点标题，命中就改走 supsub-sub / supsub-focus，**不要直接全站搜**。若用户明确说「我的订阅 / 我的公众号 / 我的网站」→ supsub-sub，「我的关注点」→ supsub-focus。注意：本 skill 用于搜「内容 / 文章 / 订阅源标题」；如果用户想发现一个新的微信公众号本身（拿 mpId 准备订阅），改用 supsub-mp。
 ---
 
@@ -34,6 +35,13 @@ description: SupSub 全文搜索 —— 在订阅源（公众号 / 网站）和�
 - 安装：`curl -fsSL https://raw.githubusercontent.com/SupSub-AI/supsub-cli/master/scripts/install.sh | bash`（native 安装，装到 `~/.local`、支持后台自动更新）；或包管理器 `npm i -g @supsub/cli` / `pnpm add -g @supsub/cli`
 - 已登录：`supsub auth status` 显示 Authenticated（首次使用先 `supsub auth login`）
 - **未授权（exit 2 / UNAUTHORIZED）时不要止步于「你未登录」**：直接运行 `supsub auth login` 为用户打开浏览器授权（命令会自动打开浏览器并阻塞等待授权，请用足够长的超时，如 10 分钟；用户只需在浏览器点确认，无需在终端输入任何内容），授权成功后重试原命令。无浏览器 / 无头环境再回退为提示用户 `SUPSUB_NO_BROWSER=1 supsub auth login`。
+
+## 调用频率限制
+
+`supsub search` 当前限制为 **每分钟最多调用 100 次**，适用于 `ALL`、`MP`、`WEBSITE` 和 `CONTENT` 搜索范围。
+
+- 批量搜索多个关键词或切换搜索范围时，每次实际搜索请求都计为一次调用；建议串行请求，相邻请求至少间隔 1 秒，避免密集并发调用。
+- 收到限流错误时，按服务端提示等待后再重试；未给出等待时间时，等待 60 秒后重试一次。若仍被限流，停止本轮批量搜索并向用户说明。
 
 ## Commands
 

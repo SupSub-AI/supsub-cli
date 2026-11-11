@@ -43,6 +43,7 @@ const FIXTURE = [
     contentId: 'zRTT6XmyB5HEVOU2MVFHXA',
     url: 'https://mp.weixin.qq.com/s/xxx',
     title: '测试文章',
+    originalTitle: '测试文章的原始标题',
     coverImage: '',
     tags: [],
     summary: '',
@@ -145,7 +146,11 @@ describe('commands/sub/contents - 查看订阅源内容', () => {
     expect(receivedUrl).toContain('pageSize=50');
   });
 
-  test('json 输出透传 contentId 字段', async () => {
+  test.each([
+    'MP',
+    'WEBSITE',
+    'X',
+  ])('%s 的 json 输出透传 contentId、title 和 originalTitle', async (sourceType) => {
     const program = buildProgram();
     await program.parseAsync([
       'node',
@@ -157,11 +162,13 @@ describe('commands/sub/contents - 查看订阅源内容', () => {
       '--source-id',
       '143',
       '--type',
-      'MP',
+      sourceType,
     ]);
     const parsed = JSON.parse(stdoutOutput);
     expect(parsed.success).toBe(true);
     expect(parsed.data[0].contentId).toBe('zRTT6XmyB5HEVOU2MVFHXA');
+    expect(parsed.data[0].title).toBe('测试文章');
+    expect(parsed.data[0].originalTitle).toBe('测试文章的原始标题');
   });
 
   test('table 输出渲染 contentId 列', async () => {
@@ -201,7 +208,11 @@ describe('commands/sub/contents - 查看订阅源内容', () => {
     expect(parsed.data[0].publishedAtText).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
   });
 
-  test('--brief 只保留 contentId/title/publishedAt(+Text)/isRead', async () => {
+  test.each([
+    'MP',
+    'WEBSITE',
+    'X',
+  ])('%s 的 --brief 保留 contentId/title/originalTitle/publishedAt(+Text)/isRead', async (sourceType) => {
     const program = buildProgram();
     await program.parseAsync([
       'node',
@@ -213,17 +224,20 @@ describe('commands/sub/contents - 查看订阅源内容', () => {
       '--source-id',
       '143',
       '--type',
-      'MP',
+      sourceType,
       '--brief',
     ]);
     const parsed = JSON.parse(stdoutOutput);
     expect(Object.keys(parsed.data[0]).sort()).toEqual([
       'contentId',
       'isRead',
+      'originalTitle',
       'publishedAt',
       'publishedAtText',
       'title',
     ]);
+    expect(parsed.data[0].title).toBe('测试文章');
+    expect(parsed.data[0].originalTitle).toBe('测试文章的原始标题');
     // summary / url / coverImage / tags 是撑爆输出的元凶，必须被丢掉
     expect(parsed.data[0].summary).toBeUndefined();
     expect(parsed.data[0].url).toBeUndefined();

@@ -1,6 +1,7 @@
 ---
 name: supsub-focus
-version: 0.1.4
+metadata:
+  version: "0.1.4"
 description: SupSub 关注点（focus）管理 —— 列出我的关注点、查看某个关注点里聚合的内容/文章（按已读/未读筛选，支持翻页）、把整个关注点标记为已读、删除关注点。匹配「我的关注点」「关注点列表」「我关注了哪些」「我关注的内容」「看 X 关注点里有哪些内容/文章」「关注点 X 有哪些未读」「关注点还有多少没读」「这个关注点我看完了 / 把关注点标为已读」「删除关注点 X」。⚠️ 已读只有**整个关注点**一档（`mark-read --all`，不可逆）：文章没有「详情 / 阅读」这一步，故不支持单篇标记已读。⚠️ 也匹配**用主题名指代自己关注点**的浏览句式：「看一下最近 X 的内容」「X 最近有什么」—— 遇到这类请求先 `supsub focus list` 比对 X 是不是已有关注点的标题（包含匹配、忽略大小写），命中就用 `focus contents` 拉该关注点内容；若 X 同时命中订阅源名，把两边都列出来让用户选；两边都没命中则直接改用 supsub-search 执行全站搜索（**不要反问用户要不要搜**），**不要**默认当成全站关键词搜索。关注点是跨多来源（公众号 MP / 网站 WEBSITE / 推特 X）按主题聚合的内容流。⚠️ 动词判别：「关注 / 关注了 / 我关注了哪些 / 关注点」都归本 skill（focus）；只有「订阅 / 订阅了」才走 supsub-sub（订阅源）。不用于订阅源的增删查（走 supsub-sub），也不用于全文关键词搜索（走 supsub-search）。CLI 没有新增关注点的命令，删除不可逆。
 ---
 
@@ -16,6 +17,14 @@ description: SupSub 关注点（focus）管理 —— 列出我的关注点、�
 - 安装：`curl -fsSL https://raw.githubusercontent.com/SupSub-AI/supsub-cli/master/scripts/install.sh | bash`（native 安装，装到 `~/.local`、支持后台自动更新）；或包管理器 `npm i -g @supsub/cli` / `pnpm add -g @supsub/cli`
 - 已登录：`supsub auth status` 显示 Authenticated（首次使用先 `supsub auth login`）
 - **未授权（exit 2 / UNAUTHORIZED）时不要止步于「你未登录」**：直接运行 `supsub auth login` 为用户打开浏览器授权（命令会自动打开浏览器并阻塞等待授权，请用足够长的超时，如 10 分钟；用户只需在浏览器点确认，无需在终端输入任何内容），授权成功后重试原命令。无浏览器 / 无头环境再回退为提示用户 `SUPSUB_NO_BROWSER=1 supsub auth login`。
+
+## 调用频率限制
+
+本 skill 涉及的关注点功能当前限制为 **每分钟最多调用 100 次**，适用于查看关注点列表、浏览关注点内容、标记已读和删除关注点。
+
+- 批量操作和自动翻页时控制请求频率，避免密集并发调用；建议串行请求，相邻请求至少间隔 1 秒。
+- `focus contents` 每请求一页都会发起一次接口调用；`--page-size 100` 表示每页最多 100 条内容，与每分钟 100 次的调用限制是两个独立限制。
+- 收到限流错误时，按服务端提示等待后再重试；未给出等待时间时，等待 60 秒后重试一次。若仍被限流，停止本轮批量操作并向用户说明。
 
 ## Commands
 
