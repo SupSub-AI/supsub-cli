@@ -1,6 +1,7 @@
 ---
 name: supsub-deepread
-version: 0.1.0
+metadata:
+  version: "0.1.0"
 description: SupSub 精读（deep read）—— 对**已经在上下文里出现过的某一篇文章**做 AI 深度拆解，产出「一句话本质 / 干货成色 / 核心要点 / 分节正文 / 编辑批注（背景·立场·来源可信度·最弱一环）」。匹配「精读这篇」「深读一下」「帮我拆解这篇」「这篇讲透了吗」「这篇靠不靠谱 / 有没有干货 / 有没有立场」「值不值得看」「把这几篇都精读了做份简报」，以及「昨天那篇精读好了吗」「我还有哪些精读没看」。命令：`supsub deepread run / get / list / quota / share / drop / show`。⚠️ **精读消耗按月付费额度**，发起前必须先 `deepread quota` 取当次余额并向用户复述「将消耗 N 次 / 本月剩 M 次」取得同意。⚠️ **contentId 必须来自本轮上下文**（sub contents / focus contents / search 的返回），匹配不到或匹配到多篇一律回问用户，绝不猜、绝不手写。⚠️ `deepread share` 生成的是**任何人可访问且无法撤销**的公开链接，生成前必须单独确认。只是浏览文章列表走 supsub-sub / supsub-focus，关键词搜文章走 supsub-search。
 ---
 
@@ -15,6 +16,14 @@ description: SupSub 精读（deep read）—— 对**已经在上下文里出现
 - 已登录：`supsub auth status` 显示 Authenticated（首次使用先 `supsub auth login`）
 - **未授权（exit 2 / UNAUTHORIZED）时不要止步于「你未登录」**：直接运行 `supsub auth login` 为用户打开浏览器授权（命令会自动打开浏览器并阻塞等待授权，请用足够长的超时，如 10 分钟；用户只需在浏览器点确认，无需在终端输入任何内容），授权成功后重试原命令。无浏览器 / 无头环境再回退为提示用户 `SUPSUB_NO_BROWSER=1 supsub auth login`。
 - 精读需要付费计划；无权限时后端返回业务错误（exit 1），如实转达并停止，不要重试。
+
+## 调用频率限制
+
+本 skill 涉及的精读接口当前限制为 **每分钟最多调用 100 次**。这是接口请求频率限制，与按月付费的精读额度是两个独立限制；月度额度仍以 `deepread quota` 当次返回为准。
+
+- 按实际接口请求数计数：状态探测、发起精读、轮询结果、查询额度和分享相关请求都属于接口调用；命中本地缓存或仅执行 `deepread drop` 时不产生精读接口请求。
+- `deepread run` 可能包含状态探测、发起任务和多次轮询；`get --wait` / `list --wait` 也会反复查询。批量精读时分批提交 `--no-wait` 任务，并为后续轮询预留调用次数，避免大量并发任务触发限流。
+- 收到限流错误时，按服务端提示等待后再重试；未给出等待时间时，等待 60 秒后重试一次。已发起的任务优先用 `get` / `list` 查询进度。若仍被限流，停止本轮批量操作并向用户说明。
 
 ## 两条硬门禁（先读这两条，再看命令）
 
@@ -69,7 +78,7 @@ supsub deepread run --type MP --content-id <cid> --title "<标题>" --source-nam
 
 ```bash
 # 1. 取候选 → 列标题 + 消耗次数给用户确认（门禁 ①）
-# 2. 并发排队，不等
+# 2. 按限流预算分批排队，不等待结果
 supsub deepread run --type MP --content-id <c1> --title "…" --no-wait -o json
 supsub deepread run --type MP --content-id <c2> --title "…" --no-wait -o json
 # 3. 一次等完

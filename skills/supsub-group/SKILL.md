@@ -1,6 +1,7 @@
 ---
 name: supsub-group
-version: 0.1.2
+metadata:
+  version: "0.1.2"
 description: SupSub 订阅分组管理 —— 创建 / 重命名 / 删除分组，查看分组内订阅源（带未读数），把订阅源加入 / 移出分组。匹配「我的分组」「新建 / 创建一个分组」「把 XX 加到 YY 分组」「把 XX 从分组移出 / 移除」「YY 分组里有哪些订阅」「这个分组还有多少未读」「重命名分组」「删除分组」「整理订阅 / 给订阅分个类」。⚠️ 消歧：**分组（group）**是把已订阅的源收纳起来的"文件夹"，按 sourceId+sourceType 组织；**关注点（focus）**是 AI 按主题聚合的内容流（「我的关注点 / 我关注了哪些」→ supsub-focus）；订阅源本身的订阅 / 退订走 supsub-sub。删除分组不可逆（组内订阅源本身不受影响）。
 ---
 
@@ -16,6 +17,14 @@ description: SupSub 订阅分组管理 —— 创建 / 重命名 / 删除分组�
 - 安装：`curl -fsSL https://raw.githubusercontent.com/SupSub-AI/supsub-cli/master/scripts/install.sh | bash`（native 安装，装到 `~/.local`、支持后台自动更新）；或包管理器 `npm i -g @supsub/cli` / `pnpm add -g @supsub/cli`
 - 已登录：`supsub auth status` 显示 Authenticated（首次使用先 `supsub auth login`）
 - **未授权（exit 2 / UNAUTHORIZED）时不要止步于「你未登录」**：直接运行 `supsub auth login` 为用户打开浏览器授权（命令会自动打开浏览器并阻塞等待授权，请用足够长的超时，如 10 分钟；用户只需在浏览器点确认，无需在终端输入任何内容），授权成功后重试原命令。无浏览器 / 无头环境再回退为提示用户 `SUPSUB_NO_BROWSER=1 supsub auth login`。
+
+## 调用频率限制
+
+本 skill 涉及的分组功能当前限制为 **每分钟最多调用 100 次**，适用于查看、创建、重命名、删除分组，以及查看和调整分组成员。
+
+- 批量操作时按实际接口请求数控制频率，避免密集并发调用；单次请求的命令建议串行执行，相邻命令至少间隔 1 秒。
+- `group add-sub` / `group remove-sub` 通常会先读取成员、再写回成员，涉及两次接口调用；批量执行时建议相邻命令至少间隔 2 秒，并保持同一分组的修改串行执行。
+- 收到限流错误时，按服务端提示等待后再重试；未给出等待时间时，等待 60 秒后重试一次。若仍被限流，停止本轮批量操作并向用户说明。
 
 ## Commands
 

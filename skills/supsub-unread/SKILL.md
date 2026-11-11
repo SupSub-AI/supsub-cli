@@ -1,6 +1,7 @@
 ---
 name: supsub-unread
-version: 0.1.2
+metadata:
+  version: "0.1.2"
 description: SupSub 未读管理（工作流）—— 一条命令看全所有订阅源与关注点的未读数（supsub unread），钻取未读文章列表（sub contents / focus contents，支持 --page 翻页），并把某个订阅源 / 某个关注点**整体**标记已读（sub mark-read --all / focus mark-read --all）。匹配「我还有什么没读 / 没看的」「有多少未读」「未读概览」「哪些号还有没读的」「帮我清未读」「这个号我读完了」「这个关注点全部标记已读」「全部已读」。⚠️ 标记已读**只有整源 / 整个关注点一档**，不支持单篇：文章没有「详情 / 阅读」这一步，产生不了自然的单篇已读事件。⚠️ `--all` 标记已读**不可逆**（无 mark-as-unread 命令），执行前必须向用户二次确认。只是浏览某个源 / 关注点的文章列表走 supsub-sub / supsub-focus；分组维度的未读数走 supsub-group（group subs）。
 ---
 
@@ -13,6 +14,14 @@ description: SupSub 未读管理（工作流）—— 一条命令看全所有�
 - 安装：`curl -fsSL https://raw.githubusercontent.com/SupSub-AI/supsub-cli/master/scripts/install.sh | bash`（native 安装，装到 `~/.local`、支持后台自动更新）；或包管理器 `npm i -g @supsub/cli` / `pnpm add -g @supsub/cli`
 - 已登录：`supsub auth status` 显示 Authenticated（首次使用先 `supsub auth login`）
 - **未授权（exit 2 / UNAUTHORIZED）时不要止步于「你未登录」**：直接运行 `supsub auth login` 为用户打开浏览器授权（命令会自动打开浏览器并阻塞等待授权，请用足够长的超时，如 10 分钟；用户只需在浏览器点确认，无需在终端输入任何内容），授权成功后重试原命令。无浏览器 / 无头环境再回退为提示用户 `SUPSUB_NO_BROWSER=1 supsub auth login`。
+
+## 调用频率限制
+
+本 skill 涉及的未读管理功能当前限制为 **每分钟最多调用 100 次**，适用于查看未读概览、浏览未读内容和整体标记已读；批量操作时按实际接口请求数控制频率。
+
+- `supsub unread` 内部会并发查询订阅源列表和关注点列表，涉及两次接口调用；连续查询概览时建议相邻命令至少间隔 2 秒。
+- `sub contents` / `focus contents` 每请求一页都会发起一次接口调用，整体标记已读也会发起请求。批量翻页和标记已读时建议串行执行，相邻命令至少间隔 1 秒；`--page-size 100` 是每页条数上限，与每分钟 100 次的调用限制是两个独立限制。
+- 收到限流错误时，按服务端提示等待后再重试；未给出等待时间时，等待 60 秒后重试一次。若仍被限流，停止本轮批量操作并向用户说明。
 
 ## 已读模型：只有「整体已读」，没有「单篇已读」
 
