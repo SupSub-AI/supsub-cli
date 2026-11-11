@@ -36,6 +36,7 @@ function toBrief(data: Article[]): ArticleBrief[] {
   return data.map((a) => ({
     contentId: a.contentId,
     title: a.title,
+    originalTitle: a.originalTitle,
     publishedAt: a.publishedAt,
     publishedAtText: formatDate(a.publishedAt),
     isRead: a.isRead,
@@ -89,7 +90,7 @@ export function registerSubContents(parent: Command): void {
     .requiredOption('--type <type>', '信息源类型：MP|WEBSITE|X（X=推特）')
     .option('--all', '显示全部文章')
     .option('--unread', '仅显示未读（默认）')
-    .option('--brief', '精简输出：仅 contentId / title / 发布时间 / 已读状态')
+    .option('--brief', '精简输出：仅 contentId / title / originalTitle / 发布时间 / 已读状态')
     .option('--page <n>', '页码（默认 1）')
     .option('--page-size <n>', '每页条数 1-100（默认 20）')
     .action(

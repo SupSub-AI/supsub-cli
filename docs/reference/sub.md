@@ -50,11 +50,13 @@ supsub sub add --source-id 12345 --type WEBSITE --group 7 --group 9
 | `--type <MP\|WEBSITE\|X>` | 必填 |
 | `--unread` | 仅未读（默认） |
 | `--all` | 全部文章（与 `--unread` 互斥） |
-| `--brief` | 精简输出：只留 `contentId` / `title` / 发布时间 / 已读状态 |
+| `--brief` | 精简输出：只留 `contentId` / `title` / `originalTitle` / 发布时间 / 已读状态 |
 | `--page <n>` | 页码（默认 `1`） |
 | `--page-size <n>` | 每页条数 `1`-`100`（默认 `20`） |
 
 输出列：`publishedAt`（`YYYY-MM-DD HH:mm`）、`read`（已读为 `✓`）、`title`、`contentId`、`url`；`--brief` 时去掉 `url` 列。
+
+`-o json` 输出包含上游返回的原始标题 `originalTitle`，适用于 `MP`、`WEBSITE` 和 `X`；`--brief -o json` 同样保留该字段。
 
 ::: warning 默认只返回未读
 要按时间浏览「最近有什么」需显式加 `--all`，否则该源读完后会返回空列表。

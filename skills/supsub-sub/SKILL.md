@@ -155,7 +155,7 @@ supsub sub contents --source-id <id> --type <MP|WEBSITE|X> [--unread | --all] [-
 | `--type` | required | `MP`（公众号）/ `WEBSITE`（网站）/ `X`（推特） |
 | `--unread` | (default) | 仅返回未读文章 |
 | `--all` | — | 返回全部文章（已读 + 未读） |
-| `--brief` | — | 精简输出：只留 `contentId` / `title` / `publishedAt(+Text)` / `isRead` |
+| `--brief` | — | 精简输出：只留 `contentId` / `title` / `originalTitle` / `publishedAt(+Text)` / `isRead` |
 | `--page` | 1 | 页码（正整数） |
 | `--page-size` | 20 | 每页条数，1-100 |
 
@@ -175,8 +175,9 @@ supsub sub contents --source-id <id> --type <MP|WEBSITE|X> [--unread | --all] [-
 **批量枚举一律加 `--brief`**：默认输出每条都带 `summary` / `coverImage` / `tags`，100 条约 90KB，
 足以撑爆工具输出上限被迫落盘；`--brief` 同样 100 条只有约 14KB。只在需要给用户讲内容时才用完整输出。
 
-每行字段：`contentId`, `url`, `title`, `coverImage`, `tags[]`, `summary`, `publishedAt`, `publishedAtText`, `isRead`。
-`--brief` 时只有 `contentId`, `title`, `publishedAt`, `publishedAtText`, `isRead`。
+每行字段：`contentId`, `url`, `title`, `originalTitle`, `coverImage`, `tags[]`, `summary`, `publishedAt`, `publishedAtText`, `isRead`。
+`--brief` 时只有 `contentId`, `title`, `originalTitle`, `publishedAt`, `publishedAtText`, `isRead`。
+`originalTitle` 是上游返回的原始标题，适用于 `MP`、`WEBSITE` 和 `X`，完整及精简 JSON 输出均保留。
 
 > `publishedAt` 是 Unix 秒级时间戳（少数后端版本为字符串），**`publishedAtText` 是 CLI 已格式化好的
 > `"YYYY-MM-DD HH:mm"`，直接用即可，不要自己写 `date -r` / 时间戳转换**。排序仍用 `publishedAt`。
@@ -198,7 +199,7 @@ supsub sub contents --source-id 12345 --type MP --page-size 100 -o json
 supsub sub contents --source-id 12345 --type MP --all -o json
 ```
 
-JSON shape: `{"success":true,"data":[{"contentId":"...","url":"...","title":"...","coverImage":"...","tags":[...],"summary":"...","publishedAt":<timestamp 或字符串>,"isRead":false}, ...]}`
+JSON shape: `{"success":true,"data":[{"contentId":"...","url":"...","title":"...","originalTitle":"...","coverImage":"...","tags":[...],"summary":"...","publishedAt":<timestamp 或字符串>,"isRead":false}, ...]}`
 
 > `publishedAt` 的原始形态随后端版本而异（Unix 秒数字 / `"YYYY-MM-DD HH:mm:ss"` 字符串），
 > **不用自己兼容——直接读 CLI 补好的 `publishedAtText`**（恒为 `"YYYY-MM-DD HH:mm"`）。

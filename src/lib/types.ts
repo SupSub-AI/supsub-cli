@@ -29,6 +29,7 @@ export type Article = {
   contentId: string; // 旧契约为 articleId，2026-07 实测线上已统一为 contentId
   url: string;
   title: string;
+  originalTitle: string; // 上游返回的原始标题
   coverImage: string;
   tags: string[];
   summary: string;
@@ -43,7 +44,10 @@ export type Article = {
 export type ArticleJson = Article & { publishedAtText: string };
 
 /** `--brief` 精简形态：批量枚举时只保留定位与判重所需字段，避免 summary 撑爆输出 */
-export type ArticleBrief = Pick<Article, 'contentId' | 'title' | 'publishedAt' | 'isRead'> & {
+export type ArticleBrief = Pick<
+  Article,
+  'contentId' | 'title' | 'originalTitle' | 'publishedAt' | 'isRead'
+> & {
   publishedAtText: string;
 };
 
